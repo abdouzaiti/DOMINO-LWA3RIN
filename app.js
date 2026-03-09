@@ -757,12 +757,16 @@ function renderStatus() {
     scoreEl.textContent=players.map(function(p){return p.score;}).join(' – ');
   }
   renderMenuScores();
-  // Pass button — always visible, disabled when player has moves or it's AI turn
+  // Pass button
   var playable=p.isAI?[]:p.hand.filter(function(t){return canPlay(t,L,R);});
   var needPass=!p.isAI&&!handoffPending&&playable.length===0&&(BY.length===0||gameRule==='block');
   var btnP=document.getElementById('btnPass');
-  if(needPass){ btnP.removeAttribute('disabled'); }
-  else { btnP.setAttribute('disabled','disabled'); }
+  btnP.setAttribute('data-pass-ready', needPass?'1':'0');
+  btnP.style.opacity=needPass?'1':'0.28';
+  btnP.style.cursor=needPass?'pointer':'default';
+  btnP.style.background=needPass?'rgba(192,57,43,.22)':'rgba(192,57,43,.04)';
+  btnP.style.color=needPass?'#e74c3c':'rgba(231,76,60,.35)';
+  btnP.style.boxShadow=needPass?'0 0 18px rgba(231,76,60,.3)':'none';
   // Boneyard active (only draw mode)
   var canDraw=gameRule==='draw'&&!p.isAI&&p.hand.filter(function(t){return canPlay(t,L,R);}).length===0&&BY.length>0;
   var boneEl=document.getElementById('boneyard');
@@ -950,7 +954,12 @@ function handoffReveal() {
   var noMoves=play.length===0&&(BY.length===0||gameRule==='block');
   if(noMoves){
     setMsg('⏭ '+p.name+' '+t('passed'),2000);
-    document.getElementById('btnPass').removeAttribute('disabled');
+    var btnP=document.getElementById('btnPass');
+    btnP.setAttribute('data-pass-ready','1');
+    btnP.style.opacity='1';btnP.style.cursor='pointer';
+    btnP.style.background='rgba(192,57,43,.22)';
+    btnP.style.color='#e74c3c';
+    btnP.style.boxShadow='0 0 18px rgba(231,76,60,.3)';
   } else {
     startTimer();
   }
@@ -1142,6 +1151,8 @@ function playerDraw(){
 }
 
 function playerPass(){
+  var btn=document.getElementById('btnPass');
+  if(btn && btn.getAttribute('data-pass-ready')==='0') return;
   if(handoffPending) return;
   sfxPass();
   setMsg('⏭ '+players[curPlayer].name+' '+t('passed'),1500);
