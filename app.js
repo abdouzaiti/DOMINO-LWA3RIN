@@ -58,6 +58,12 @@ var I18N = {
     winsMatch:'wins the match!', drawModeTag:'[DRAW]', blockModeTag:'[BLOCK]',
     quickPhrases:['Good move! 👏','Nice one! 🎯','Lucky! 😄','Uh oh... 😅','Domino! 🎴','Let\'s go! 💪'],
     players:' players', eachTurns:'Each player takes turns',
+    teamA:'Team A', teamB:'Team B',
+    team2v2:'2 vs 2 Teams', team2v2Desc:'Players 1&3 vs Players 2&4. Share scores!',
+    chooseStarter:'Who starts next round?', youStart:'I\'ll start', partnerStart:'Partner starts',
+    teamWins:'TEAM WINS!', teamScore:'Team Score',
+    winsRoundFor:'wins the round for',
+    partnersScore:'Your team earns',
     pipExhausted:'All [N] tiles are played — board is closed!',
     pipWins:'wins (pip [N] exhausted — lowest hand wins)'
   },
@@ -102,6 +108,12 @@ var I18N = {
     winsMatch:'gagne le match !', drawModeTag:'[PIOCHE]', blockModeTag:'[BLOCAGE]',
     quickPhrases:['Bien joué! 👏','Bravo! 🎯','Chanceux! 😄','Aïe... 😅','Domino! 🎴','Allez! 💪'],
     players:' joueurs', eachTurns:'Chaque joueur à son tour',
+    teamA:'Équipe A', teamB:'Équipe B',
+    team2v2:'2 vs 2 Équipes', team2v2Desc:'Joueurs 1&3 vs Joueurs 2&4. Scores partagés!',
+    chooseStarter:'Qui commence la prochaine manche?', youStart:'Je commence', partnerStart:'Mon partenaire commence',
+    teamWins:'ÉQUIPE GAGNE!', teamScore:'Score Équipe',
+    winsRoundFor:'gagne la manche pour',
+    partnersScore:'Votre équipe gagne',
     pipExhausted:'Toutes les tuiles [N] sont jouées — plateau fermé!',
     pipWins:'gagne (pip [N] épuisé — moins de pips gagne)'
   },
@@ -146,6 +158,12 @@ var I18N = {
     winsMatch:'فاز بالمباراة!', drawModeTag:'[سحب]', blockModeTag:'[حجب]',
     quickPhrases:['أحسنت! 👏','رائع! 🎯','محظوظ! 😄','آخ... 😅','دومينو! 🎴','هيا! 💪'],
     players:' لاعبين', eachTurns:'كل لاعب بدوره',
+    teamA:'الفريق أ', teamB:'الفريق ب',
+    team2v2:'2 ضد 2 فرق', team2v2Desc:'اللاعبون 1&3 ضد 2&4. نقاط مشتركة!',
+    chooseStarter:'من يبدأ الجولة التالية؟', youStart:'سأبدأ أنا', partnerStart:'شريكي يبدأ',
+    teamWins:'الفريق يفوز!', teamScore:'نقاط الفريق',
+    winsRoundFor:'يفوز بالجولة لصالح',
+    partnersScore:'فريقك يكسب',
     pipExhausted:'كل قطع [N] لُعبت — اللوحة مغلقة!',
     pipWins:'يفوز (قطع [N] نفدت — أقل نقاط يفوز)'
   }
@@ -231,6 +249,12 @@ var msgTmr         = null;
 var timerTmr       = null;
 var timerSec       = 0;
 var chatMessages   = [];
+var lastRoundWinner = -1;  // who won the last round (starts next)
+var teamMode       = false; // true when 4 players (2v2)
+// Teams: players[0]&[2] = Team A, players[1]&[3] = Team B
+// teamScores[0]=Team A total, teamScores[1]=Team B total
+var teamScores     = [0,0];
+var pendingWinIdx  = -1;   // winner waiting to choose who starts next round
 
 
 /* ─────────────────────────────────────────────────────────
@@ -271,6 +295,9 @@ function getEnds(tile,le,re) {
 }
 
 function bestStart() {
+  // If there was a previous round winner, they start
+  if(lastRoundWinner >= 0 && lastRoundWinner < players.length) return lastRoundWinner;
+  // First game: highest double, else highest pip sum
   var best=-1,who=0;
   players.forEach(function(p,i){
     p.hand.forEach(function(t){if(t.a===t.b&&t.a>best){best=t.a;who=i;}});
@@ -720,7 +747,7 @@ function renderAIArea() {
     c.appendChild(el);
   });
   document.getElementById('aiCnt').textContent=ai.hand.length;
-  document.getElementById('aiPip').textContent=sumH(ai.hand);
+  document.getElementById('aiPip').textContent='?'; // hidden
 }
 
 function renderOpponents() {
@@ -797,17 +824,29 @@ function renderGoalBar() {
   var inner=document.getElementById('goalInner');
   if(gameRule!=='draw'){bar.style.display='none';return;}
   bar.style.display='block'; inner.innerHTML='';
-  players.forEach(function(p,i){
-    var col=PLAYER_COLORS[i];
-    var pct=Math.min(100,Math.round(p.score/DRAW_WIN_SCORE*100));
-    var row=document.createElement('div'); row.className='goal-row';
-    row.style.color=col;
-    row.innerHTML=
-      '<span class="goal-name">'+p.name+'</span>'+
-      '<div class="goal-track"><div class="goal-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'+
-      '<span class="goal-val">'+p.score+'</span>';
-    inner.appendChild(row);
-  });
+  if(teamMode){
+    [[0,t('teamA')],[1,t('teamB')]].forEach(function(tv){
+      var tidx=tv[0],tnm=tv[1];
+      var col=tidx===0?PLAYER_COLORS[0]:PLAYER_COLORS[1];
+      var members=players.filter(function(p){return p.team===tidx;}).map(function(p){return p.name;}).join(' & ');
+      var pct=Math.min(100,Math.round(teamScores[tidx]/DRAW_WIN_SCORE*100));
+      var row=document.createElement('div'); row.className='goal-row'; row.style.color=col;
+      row.innerHTML='<span class="goal-name">'+members+'</span>'+
+        '<div class="goal-track"><div class="goal-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'+
+        '<span class="goal-val">'+teamScores[tidx]+'</span>';
+      inner.appendChild(row);
+    });
+  } else {
+    players.forEach(function(p,i){
+      var col=PLAYER_COLORS[i];
+      var pct=Math.min(100,Math.round(p.score/DRAW_WIN_SCORE*100));
+      var row=document.createElement('div'); row.className='goal-row'; row.style.color=col;
+      row.innerHTML='<span class="goal-name">'+p.name+'</span>'+
+        '<div class="goal-track"><div class="goal-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'+
+        '<span class="goal-val">'+p.score+'</span>';
+      inner.appendChild(row);
+    });
+  }
 }
 
 function renderAll() {
@@ -854,7 +893,7 @@ function setColor(color, swatchEl) {
    12. MODE SETUP
    ───────────────────────────────────────────────────────── */
 function startVsAI() {
-  mode='ai'; numPlayers=2;
+  mode='ai'; numPlayers=2; teamMode=false; lastRoundWinner=-1; teamScores=[0,0];
   players=[
     {name:'You',hand:[],score:0,isAI:false},
     {name:'AI', hand:[],score:0,isAI:true}
@@ -881,13 +920,28 @@ function rebuildPlayerCountBtns() {
 function setupMultiPlayers(n) {
   numPlayers=n;
   var fields=document.getElementById('nameFields'); fields.innerHTML='';
+  // For 4 players: add team header dividers
+  if(n===4){
+    var hA=document.createElement('div');
+    hA.style.cssText='font-size:10px;font-weight:900;letter-spacing:2px;color:'+PLAYER_COLORS[0]+';padding:4px 0 2px;border-bottom:1px solid '+PLAYER_COLORS[0]+'44;margin-bottom:6px;';
+    hA.textContent='⚡ TEAM A';
+    fields.appendChild(hA);
+  }
   for(var i=0;i<n;i++){
     (function(idx){
       var col=PLAYER_COLORS[idx];
+      // Insert Team B header before player 2
+      if(n===4&&idx===2){
+        var hB=document.createElement('div');
+        hB.style.cssText='font-size:10px;font-weight:900;letter-spacing:2px;color:'+PLAYER_COLORS[1]+';padding:10px 0 2px;border-bottom:1px solid '+PLAYER_COLORS[1]+'44;margin-bottom:6px;';
+        hB.textContent='⚡ TEAM B';
+        fields.appendChild(hB);
+      }
       var row=document.createElement('div'); row.className='name-row';
       var icon=document.createElement('div'); icon.className='name-row-icon'; icon.textContent=PLAYER_EMOJIS[idx];
       var inp=document.createElement('input'); inp.id='nameInp'+idx; inp.type='text';
-      inp.placeholder='Player '+(idx+1); inp.maxLength=12; inp.className='name-input';
+      inp.placeholder='Player '+(idx+1)+(n===4?' (Team '+(idx%2===0?'A':'B')+')':'');
+      inp.maxLength=12; inp.className='name-input';
       inp.style.borderColor=col;
       row.appendChild(icon); row.appendChild(inp); fields.appendChild(row);
     })(i);
@@ -896,11 +950,14 @@ function setupMultiPlayers(n) {
 }
 
 function startMulti() {
-  mode='multi'; players=[];
+  mode='multi'; players=[]; lastRoundWinner=-1; teamScores=[0,0];
+  teamMode=(numPlayers===4);
   for(var i=0;i<numPlayers;i++){
     var inp=document.getElementById('nameInp'+i);
     var nm=(inp&&inp.value.trim())||('Player '+(i+1));
-    players.push({name:nm,hand:[],score:0,isAI:false});
+    // team: players 0&2 = team 0, players 1&3 = team 1
+    var team=teamMode?(i%2):i;
+    players.push({name:nm,hand:[],score:0,isAI:false,team:team});
   }
   launchGame();
 }
@@ -926,8 +983,8 @@ function launchGame() {
   else startTimer();
 }
 
-function restartGame() { launchGame(); }
-function nextRound()   { launchGame(); }
+function restartGame() { lastRoundWinner=-1; teamScores=[0,0]; players.forEach(function(p){p.score=0;}); launchGame(); }
+function nextRound()   { launchGame(); } // lastRoundWinner preserved
 
 
 /* ─────────────────────────────────────────────────────────
@@ -993,35 +1050,66 @@ function endRound(winIdx) {
   var winner=players[winIdx];
   var col=PLAYER_COLORS[winIdx];
   stopTimer();
+  lastRoundWinner=winIdx; // this player (or team partner) starts next round
 
   if(gameRule==='draw') {
-    // Earn points equal to opponents' pip totals
     var earned=0;
-    players.forEach(function(p,i){if(i!==winIdx) earned+=sumH(p.hand);});
-    winner.score+=earned;
-    // Check if match is won
-    if(winner.score>=DRAW_WIN_SCORE){
-      sfxWin();
-      showMatchWinner(winIdx);
-      return;
+    if(teamMode) {
+      // 2v2: winning team earns sum of BOTH losing team members' pips
+      var losingTeam=1-winner.team;
+      players.forEach(function(p){ if(p.team===losingTeam) earned+=sumH(p.hand); });
+      // Add to both winning team members' scores
+      players.forEach(function(p){ if(p.team===winner.team) p.score+=earned; });
+      teamScores[winner.team]+=earned;
+    } else {
+      players.forEach(function(p,i){if(i!==winIdx) earned+=sumH(p.hand);});
+      winner.score+=earned;
     }
+    // Check match win
+    var matchWon=false;
+    if(teamMode){
+      matchWon=teamScores[winner.team]>=DRAW_WIN_SCORE;
+    } else {
+      matchWon=winner.score>=DRAW_WIN_SCORE;
+    }
+    if(matchWon){ sfxWin(); showMatchWinner(winIdx); return; }
     sfxWin();
-    // Show round summary
+    // Show round summary then "who starts next?"
+    pendingWinIdx=winIdx;
     document.getElementById('roundTitle').textContent=t('roundOver');
-    document.getElementById('roundSub').textContent=winner.name+' '+t('winsRound')+' +'+earned+' '+t('pts');
+    var subMsg=teamMode
+      ? winner.name+' '+t('winsRoundFor')+' '+(winner.team===0?t('teamA'):t('teamB'))+' +'+earned+' '+t('pts')
+      : winner.name+' '+t('winsRound')+' +'+earned+' '+t('pts');
+    document.getElementById('roundSub').textContent=subMsg;
     document.getElementById('roundSub').style.color=col;
     var rsEl=document.getElementById('roundScores'); rsEl.innerHTML='';
-    players.forEach(function(p,i){
-      var c2=PLAYER_COLORS[i];
-      var row=document.createElement('div');
-      row.className='round-score-row'+(i===winIdx?' winner':'');
-      row.innerHTML='<span style="color:'+c2+';font-weight:700">'+PLAYER_EMOJIS[i]+' '+p.name+'</span>'+
-        '<span style="color:'+c2+';font-weight:900;font-family:monospace;font-size:20px">'+p.score+'<span style="font-size:11px;opacity:.6"> / '+DRAW_WIN_SCORE+'</span></span>';
-      rsEl.appendChild(row);
-    });
+    if(teamMode) {
+      // Show team scores
+      [[0,t('teamA')],[1,t('teamB')]].forEach(function(tv){
+        var tidx=tv[0], tnm=tv[1];
+        var tc=tidx===0?PLAYER_COLORS[0]:PLAYER_COLORS[1];
+        var row=document.createElement('div'); row.className='round-score-row'+(tidx===winner.team?' winner':'');
+        row.innerHTML='<span style="color:'+tc+';font-weight:700">'+tnm+' ('+players.filter(function(p){return p.team===tidx;}).map(function(p){return p.name;}).join(' & ')+')</span>'+
+          '<span style="color:'+tc+';font-weight:900;font-family:monospace;font-size:20px">'+teamScores[tidx]+'<span style="font-size:11px;opacity:.6"> / '+DRAW_WIN_SCORE+'</span></span>';
+        rsEl.appendChild(row);
+      });
+    } else {
+      players.forEach(function(p,i){
+        var c2=PLAYER_COLORS[i];
+        var row=document.createElement('div'); row.className='round-score-row'+(i===winIdx?' winner':'');
+        row.innerHTML='<span style="color:'+c2+';font-weight:700">'+PLAYER_EMOJIS[i]+' '+p.name+'</span>'+
+          '<span style="color:'+c2+';font-weight:900;font-family:monospace;font-size:20px">'+p.score+'<span style="font-size:11px;opacity:.6"> / '+DRAW_WIN_SCORE+'</span></span>';
+        rsEl.appendChild(row);
+      });
+    }
+    // If 2v2: show "who starts" buttons inside round overlay; else just show Next Round
+    if(teamMode) {
+      buildTeamStarterChoice(winIdx, rsEl.parentNode);
+    }
+    // Re-show Next Round button (may have been hidden by previous 2v2 round)
+    var nrBtn=document.querySelector('#roundOvl .btn-gold'); if(nrBtn) nrBtn.style.display='block';
     document.getElementById('roundOvl').style.display='flex';
   } else {
-    // Block mode — single round win
     sfxWin();
     showMatchWinner(winIdx,'emptied');
   }
@@ -1030,28 +1118,23 @@ function endRound(winIdx) {
 function checkBlocked() {
   var allStuck=players.every(function(p){return !p.hand.some(function(t){return canPlay(t,L,R);});});
   if(allStuck&&(BY.length===0||gameRule==='block')){
-    var min=Infinity,winIdx=0;
-    players.forEach(function(p,i){var s=sumH(p.hand);if(s<min){min=s;winIdx=i;}});
     stopTimer();
+    // Find winner by lowest pip — in team mode, compare team totals
+    var winIdx=0;
+    if(teamMode){
+      var tA=players.filter(function(p){return p.team===0;}).reduce(function(s,p){return s+sumH(p.hand);},0);
+      var tB=players.filter(function(p){return p.team===1;}).reduce(function(s,p){return s+sumH(p.hand);},0);
+      var winTeam=tA<=tB?0:1;
+      // pick the player from winning team who has fewer pips (will be shown as winner)
+      var best=Infinity;
+      players.forEach(function(p,i){if(p.team===winTeam&&sumH(p.hand)<best){best=sumH(p.hand);winIdx=i;}});
+    } else {
+      var min=Infinity;
+      players.forEach(function(p,i){var s=sumH(p.hand);if(s<min){min=s;winIdx=i;}});
+    }
+    lastRoundWinner=winIdx;
     if(gameRule==='draw'){
-      var winner=players[winIdx];
-      var col=PLAYER_COLORS[winIdx];
-      var earned=0;
-      players.forEach(function(p,i){if(i!==winIdx)earned+=sumH(p.hand);});
-      winner.score+=earned;
-      if(winner.score>=DRAW_WIN_SCORE){sfxWin();showMatchWinner(winIdx);return;}
-      sfxWin();
-      document.getElementById('roundTitle').textContent=t('roundOver');
-      document.getElementById('roundSub').textContent=winner.name+' '+t('blockedWins');
-      document.getElementById('roundSub').style.color=col;
-      var rsEl=document.getElementById('roundScores'); rsEl.innerHTML='';
-      players.forEach(function(p,i){
-        var c2=PLAYER_COLORS[i];
-        var row=document.createElement('div'); row.className='round-score-row'+(i===winIdx?' winner':'');
-        row.innerHTML='<span style="color:'+c2+';font-weight:700">'+PLAYER_EMOJIS[i]+' '+p.name+'</span><span style="color:'+c2+';font-weight:900;font-family:monospace;font-size:20px">'+p.score+'<span style="font-size:11px;opacity:.6"> / '+DRAW_WIN_SCORE+'</span></span>';
-        rsEl.appendChild(row);
-      });
-      document.getElementById('roundOvl').style.display='flex';
+      endRound(winIdx); // reuse endRound for scoring
     } else {
       sfxWin();
       showMatchWinner(winIdx,'blocked');
@@ -1059,31 +1142,93 @@ function checkBlocked() {
   }
 }
 
+
+/* Show "who starts next round" choice for 2v2 winner */
+function buildTeamStarterChoice(winIdx, container) {
+  // Remove any existing next-round button from roundOvl
+  var existing=document.querySelector('#roundOvl .btn-gold');
+  if(existing) existing.style.display='none';
+
+  var winTeam=players[winIdx].team;
+  // Find the partner (same team, different player index)
+  var partnerIdx=-1;
+  players.forEach(function(p,i){if(i!==winIdx&&p.team===winTeam) partnerIdx=i;});
+
+  var col=PLAYER_COLORS[winIdx];
+  var box=document.createElement('div');
+  box.style.cssText='margin-top:14px;text-align:center;';
+  var lbl=document.createElement('div');
+  lbl.style.cssText='color:#5a6e88;font-size:11px;letter-spacing:1px;margin-bottom:10px;';
+  lbl.textContent=t('chooseStarter');
+  box.appendChild(lbl);
+
+  var btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:8px;';
+
+  var btnMe=document.createElement('button');
+  btnMe.style.cssText='flex:1;padding:11px 0;border-radius:10px;border:none;background:linear-gradient(135deg,'+col+','+col+'99);color:#000;font-weight:900;font-size:13px;cursor:pointer;';
+  btnMe.textContent=PLAYER_EMOJIS[winIdx]+' '+players[winIdx].name;
+  btnMe.onclick=function(){ lastRoundWinner=winIdx; document.getElementById('roundOvl').style.display='none'; launchGame(); };
+
+  btnRow.appendChild(btnMe);
+
+  if(partnerIdx>=0){
+    var pCol=PLAYER_COLORS[partnerIdx];
+    var btnPart=document.createElement('button');
+    btnPart.style.cssText='flex:1;padding:11px 0;border-radius:10px;border:none;background:linear-gradient(135deg,'+pCol+','+pCol+'99);color:#000;font-weight:900;font-size:13px;cursor:pointer;';
+    btnPart.textContent=PLAYER_EMOJIS[partnerIdx]+' '+players[partnerIdx].name;
+    btnPart.onclick=function(){ lastRoundWinner=partnerIdx; document.getElementById('roundOvl').style.display='none'; launchGame(); };
+    btnRow.appendChild(btnPart);
+  }
+
+  box.appendChild(btnRow);
+  container.appendChild(box);
+}
+
 function showMatchWinner(winIdx,reason) {
   var winner=players[winIdx], col=PLAYER_COLORS[winIdx];
-  winner.score = winner.score || (winner.score+1);
-  players[winIdx].score++;
   document.getElementById('goEmoji').textContent='🏆';
-  document.getElementById('goTitle').textContent=t('victory');
   document.getElementById('goTitle').style.color=col;
   document.getElementById('goTitle').style.filter='drop-shadow(0 0 28px '+col+'aa)';
-  document.getElementById('goSub').textContent=winner.name+' '+t('winsMatch');
-  document.getElementById('goSub').style.color=col;
-  document.getElementById('goReason').textContent=
-    (reason==='blocked'||reason==='pipexhaust')?winner.name+' '+t('blockedWins'):winner.name+' '+t('emptiedHand');
   document.getElementById('govl').style.background='radial-gradient(ellipse at center,'+col+'44 0%,rgba(4,8,14,.97) 65%)';
   var panel=document.getElementById('goPanel');
-  panel.innerHTML='<div class="go-scoreboard-title">'+t('scoreboard')+'</div>';
-  var sorted=players.map(function(p,i){return{p:p,i:i};}).sort(function(a,b){return b.p.score-a.p.score;});
-  sorted.forEach(function(s){
-    var isW=s.i===winIdx, c2=PLAYER_COLORS[s.i];
-    var row=document.createElement('div'); row.className='go-score-row'+(isW?' winner':'');
-    var nameS=document.createElement('span'); nameS.className='go-name'; nameS.style.color=isW?c2:'#5a6e88';
-    nameS.textContent=(isW?'🥇 ':'')+PLAYER_EMOJIS[s.i]+' '+s.p.name;
-    var ptsS=document.createElement('span'); ptsS.className='go-points'; ptsS.style.color=c2;
-    ptsS.textContent=s.p.score;
-    row.appendChild(nameS); row.appendChild(ptsS); panel.appendChild(row);
-  });
+
+  if(teamMode) {
+    var winTeam=winner.team;
+    var teamName=winTeam===0?t('teamA'):t('teamB');
+    var teamMembers=players.filter(function(p){return p.team===winTeam;}).map(function(p){return p.name;}).join(' & ');
+    document.getElementById('goTitle').textContent=t('teamWins');
+    document.getElementById('goSub').textContent=teamName+': '+teamMembers;
+    document.getElementById('goSub').style.color=col;
+    document.getElementById('goReason').textContent=(reason==='blocked'||reason==='pipexhaust')?winner.name+' '+t('blockedWins'):winner.name+' '+t('emptiedHand');
+    panel.innerHTML='<div class="go-scoreboard-title">'+t('teamScore')+'</div>';
+    [[0,t('teamA')],[1,t('teamB')]].forEach(function(tv){
+      var tidx=tv[0],tnm=tv[1];
+      var tc=tidx===0?PLAYER_COLORS[0]:PLAYER_COLORS[1];
+      var row=document.createElement('div'); row.className='go-score-row'+(tidx===winTeam?' winner':'');
+      var nameS=document.createElement('span'); nameS.className='go-name'; nameS.style.color=tidx===winTeam?tc:'#5a6e88';
+      nameS.textContent=(tidx===winTeam?'🥇 ':'')+tnm+' ('+players.filter(function(p){return p.team===tidx;}).map(function(p){return p.name;}).join(' & ')+')';
+      var ptsS=document.createElement('span'); ptsS.className='go-points'; ptsS.style.color=tc;
+      ptsS.textContent=teamScores[tidx];
+      row.appendChild(nameS); row.appendChild(ptsS); panel.appendChild(row);
+    });
+  } else {
+    document.getElementById('goTitle').textContent=t('victory');
+    document.getElementById('goSub').textContent=winner.name+' '+t('winsMatch');
+    document.getElementById('goSub').style.color=col;
+    document.getElementById('goReason').textContent=(reason==='blocked'||reason==='pipexhaust')?winner.name+' '+t('blockedWins'):winner.name+' '+t('emptiedHand');
+    panel.innerHTML='<div class="go-scoreboard-title">'+t('scoreboard')+'</div>';
+    var sorted=players.map(function(p,i){return{p:p,i:i};}).sort(function(a,b){return b.p.score-a.p.score;});
+    sorted.forEach(function(s){
+      var isW=s.i===winIdx, c2=PLAYER_COLORS[s.i];
+      var row=document.createElement('div'); row.className='go-score-row'+(isW?' winner':'');
+      var nameS=document.createElement('span'); nameS.className='go-name'; nameS.style.color=isW?c2:'#5a6e88';
+      nameS.textContent=(isW?'🥇 ':'')+PLAYER_EMOJIS[s.i]+' '+s.p.name;
+      var ptsS=document.createElement('span'); ptsS.className='go-points'; ptsS.style.color=c2;
+      ptsS.textContent=s.p.score;
+      row.appendChild(nameS); row.appendChild(ptsS); panel.appendChild(row);
+    });
+  }
   document.getElementById('govl').style.display='flex';
   document.getElementById('roundOvl').style.display='none';
   renderMenuScores();
