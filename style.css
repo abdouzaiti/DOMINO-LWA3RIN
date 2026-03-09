@@ -270,7 +270,5 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 .btn-menu{flex:1;padding:14px 0;border-radius:12px;border:1px solid #1e2e44;background:rgba(255,255,255,.04);color:#a0a8b8;font-weight:700;font-size:15px;cursor:pointer}
 
 /* ── PASS BUTTON (bottom, always visible) ───────────────── */
-#btnPass{display:block;width:calc(100% - 24px);margin:6px 12px 10px;padding:11px 0;border-radius:10px;border:1.5px solid #c0392b;background:rgba(192,57,43,.06);color:rgba(231,76,60,.35);font-size:13px;font-weight:900;cursor:default;letter-spacing:2px;transition:all .25s}
-#btnPass:not([disabled]):hover,#btnPass:not([disabled]){cursor:pointer;opacity:1;color:#e74c3c;background:rgba(192,57,43,.18);box-shadow:0 0 18px rgba(231,76,60,.3)}
-#btnPass[disabled]{opacity:.3;cursor:default;box-shadow:none;background:rgba(192,57,43,.04);color:rgba(231,76,60,.3)}
-#btnPass:not([disabled]):active{transform:scale(0.97)}
+#btnPass{display:block;width:calc(100% - 24px);margin:6px 12px 10px;padding:11px 0;border-radius:10px;border:1.5px solid #c0392b;background:rgba(192,57,43,.04);color:rgba(231,76,60,.35);font-size:13px;font-weight:900;letter-spacing:2px;transition:opacity .25s,background .25s,box-shadow .25s;border:none;outline:none}
+#btnPass:active{transform:scale(0.97)}
