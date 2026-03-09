@@ -133,7 +133,7 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 .top-logo{font-family:Impact,sans-serif;font-size:18px;color:#d4a843;letter-spacing:3px;flex-shrink:0}
 #topMsg{flex:1;text-align:center;font-size:11px;font-weight:700;color:#d4a843;letter-spacing:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top-actions{display:flex;gap:5px;align-items:center;flex-shrink:0}
-#btnPass{display:none;padding:5px 10px;border-radius:7px;border:1px solid #c0392b;background:rgba(192,57,43,.15);color:#e74c3c;font-size:11px;font-weight:700;cursor:pointer}
+
 
 /* ── TIMER ─────────────────────────────────────────────── */
 #timerBadge{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -210,7 +210,7 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 .bone-lbl{font-size:9px;color:rgba(255,255,255,.3);letter-spacing:1px}
 
 /* ── PLAYER HAND ───────────────────────────────────────── */
-#playerArea{background:#0a1018;border-top:1px solid #182030;flex-shrink:0;padding:6px 12px 12px}
+#playerArea{background:#0a1018;border-top:1px solid #182030;flex-shrink:0;padding:6px 12px 8px}
 #handLabel{font-size:9px;color:#3a4e62;letter-spacing:2px;margin-bottom:5px}
 #playerHand{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;min-height:86px;align-items:flex-end;padding-bottom:4px}
 
@@ -268,3 +268,8 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 .gameover-btns{display:flex;gap:10px}
 .btn-rematch{flex:1;padding:14px 0;border-radius:12px;border:none;background:linear-gradient(135deg,#d4a843,#b07820);color:#000;font-weight:900;font-size:15px;cursor:pointer}
 .btn-menu{flex:1;padding:14px 0;border-radius:12px;border:1px solid #1e2e44;background:rgba(255,255,255,.04);color:#a0a8b8;font-weight:700;font-size:15px;cursor:pointer}
+
+/* ── PASS BUTTON (bottom, always visible) ───────────────── */
+#btnPass{display:block;width:calc(100% - 24px);margin:6px 12px 10px;padding:11px 0;border-radius:10px;border:1.5px solid #c0392b;background:rgba(192,57,43,.08);color:#e74c3c;font-size:13px;font-weight:900;cursor:pointer;letter-spacing:2px;transition:all .2s;opacity:.35;pointer-events:none}
+#btnPass.pass-active{opacity:1;pointer-events:auto;background:rgba(192,57,43,.18);box-shadow:0 0 18px rgba(231,76,60,.25)}
+#btnPass.pass-active:active{transform:scale(0.97)}
