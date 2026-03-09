@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="htmlRoot">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>DOMINO LWA3RIN</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ MAIN MENU ══ -->
+  <div id="scrMenu" class="scr on">
+    <div id="menuBg"></div>
+    <div class="lang-bar">
+      <button class="lang-btn" id="lb-en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" id="lb-fr" onclick="setLang('fr')">FR</button>
+      <button class="lang-btn" id="lb-ar" onclick="setLang('ar')">AR</button>
+    </div>
+    <div class="menu-logo-wrap">
+      <div class="menu-title">DOMINO<br>LWA3RIN</div>
+      <div class="menu-subtitle" data-i18n="subtitle"></div>
+      <div id="menuPreview"></div>
+    </div>
+    <div id="menuScores"></div>
+    <div class="menu-buttons">
+      <button class="btn-primary" onclick="go('scrMode')" data-i18n="play"></button>
+      <button class="btn-secondary" onclick="go('scrHow')" data-i18n="howto"></button>
+      <button class="btn-secondary" onclick="go('scrSet')" data-i18n="settings"></button>
+    </div>
+    <div class="menu-credit">Developed by Zaiti Abderrahmane</div>
+  </div>
+
+  <!-- ══ SELECT OPPONENT ══ -->
+  <div id="scrMode" class="scr sub-screen">
+    <button class="btn-back" onclick="go('scrMenu')">← <span data-i18n="back"></span></button>
+    <div class="screen-title" data-i18n="selectMode"></div>
+    <div class="mode-card" onclick="go('scrGameMode')">
+      <div class="mode-card-icon">🤖</div>
+      <div><div class="mode-card-title" data-i18n="vsAI"></div><div class="mode-card-desc" data-i18n="vsAIDesc"></div></div>
+      <div class="mode-card-arrow">▶</div>
+    </div>
+    <div class="mode-card" onclick="go('scrGameMode2')">
+      <div class="mode-card-icon">👥</div>
+      <div><div class="mode-card-title" data-i18n="localMulti"></div><div class="mode-card-desc" data-i18n="localMultiDesc"></div></div>
+      <div class="mode-card-arrow">▶</div>
+    </div>
+  </div>
+
+  <!-- ══ GAME RULE MODE (vs AI path) ══ -->
+  <div id="scrGameMode" class="scr sub-screen">
+    <button class="btn-back" onclick="go('scrMode')">← <span data-i18n="back"></span></button>
+    <div class="screen-title" data-i18n="selectRules"></div>
+    <div class="mode-card" onclick="setGameRule('draw'); go('scrDiff')">
+      <div class="mode-card-icon">🎴</div>
+      <div><div class="mode-card-title" data-i18n="drawMode"></div><div class="mode-card-desc" data-i18n="drawModeDesc"></div></div>
+      <div class="mode-card-arrow">▶</div>
+    </div>
+    <div class="mode-card" onclick="setGameRule('block'); go('scrDiff')">
+      <div class="mode-card-icon">🚫</div>
+      <div><div class="mode-card-title" data-i18n="blockMode"></div><div class="mode-card-desc" data-i18n="blockModeDesc"></div></div>
+      <div class="mode-card-arrow">▶</div>
+    </div>
+  </div>
+
+  <!-- ══ GAME RULE MODE (multi path) ══ -->
+  <div id="scrGameMode2" class="scr sub-screen">
+    <button class="btn-back" onclick="go('scrMode')">← <span data-i18n="back"></span></button>
+    <div class="screen-title" data-i18n="selectRules"></div>
+    <div class="mode-card" onclick="setGameRule('draw'); go('scrPlayers')">
+      <div class="mode-card-icon">🎴</div>
+      <div><div class="mode-card-title" data-i18n="drawMode"></div><div class="mode-card-desc" data-i18n="drawModeDesc"></div></div>
+      <div class="mode-card-arrow">▶</div>
+    </div>
+    <div class="mode-card" onclick="setGameRule('block'); go('scrPlayers')">
+      <div class="mode-card-icon">🚫</div>
+      <div><div class="mode-card-title" data-i18n="blockMode"></div><div class="mode-card-desc" data-i18n="blockModeDesc"></div></div>
+      <div class="mode-card-arrow">▶</div>
+    </div>
+  </div>
+
+  <!-- ══ AI DIFFICULTY ══ -->
+  <div id="scrDiff" class="scr sub-screen">
+    <button class="btn-back" onclick="go('scrGameMode')">← <span data-i18n="back"></span></button>
+    <div class="screen-title" data-i18n="difficulty"></div>
+    <div class="mode-card" onclick="setDiff('easy'); startVsAI()">
+      <div class="mode-card-icon">😊</div>
+      <div><div class="mode-card-title diff-easy" data-i18n="easy"></div><div class="mode-card-desc" data-i18n="easyDesc"></div></div>
+      <div class="diff-badge diff-badge-easy" data-i18n="easy"></div>
+    </div>
+    <div class="mode-card" onclick="setDiff('medium'); startVsAI()">
+      <div class="mode-card-icon">🧠</div>
+      <div><div class="mode-card-title diff-medium" data-i18n="medium"></div><div class="mode-card-desc" data-i18n="mediumDesc"></div></div>
+      <div class="diff-badge diff-badge-medium" data-i18n="medium"></div>
+    </div>
+    <div class="mode-card" onclick="setDiff('hard'); startVsAI()">
+      <div class="mode-card-icon">💀</div>
+      <div><div class="mode-card-title diff-hard" data-i18n="hard"></div><div class="mode-card-desc" data-i18n="hardDesc"></div></div>
+      <div class="diff-badge diff-badge-hard" data-i18n="hard"></div>
+    </div>
+  </div>
+
+  <!-- ══ PLAYER COUNT ══ -->
+  <div id="scrPlayers" class="scr sub-screen">
+    <button class="btn-back" onclick="go('scrGameMode2')">← <span data-i18n="back"></span></button>
+    <div class="screen-title" data-i18n="howManyPlayers"></div>
+    <div class="screen-subtitle" data-i18n="passDevice"></div>
+    <div id="playerCountBtns"></div>
+  </div>
+
+  <!-- ══ NAME SETUP ══ -->
+  <div id="scrNames" class="scr sub-screen">
+    <button class="btn-back" onclick="go('scrPlayers')">← <span data-i18n="back"></span></button>
+    <div class="screen-title" data-i18n="playerNames"></div>
+    <div class="screen-subtitle" data-i18n="playerNamesDesc"></div>
+    <div id="nameFields"></div>
+    <button class="btn-start" onclick="startMulti()" data-i18n="startGame"></button>
+  </div>
+
+  <!-- ══ HOW TO PLAY ══ -->
+  <div id="scrHow" class="scr sub-screen" style="overflow-y:auto">
+    <button class="btn-back" onclick="go('scrMenu')">← <span data-i18n="back"></span></button>
+    <div class="how-title" data-i18n="howToPlay"></div>
+    <div class="rule-row"><span class="rule-icon">🎴</span><p class="rule-text" data-i18n="rule1"></p></div>
+    <div class="rule-row"><span class="rule-icon">🚀</span><p class="rule-text" data-i18n="rule2"></p></div>
+    <div class="rule-row"><span class="rule-icon">🔗</span><p class="rule-text" data-i18n="rule3"></p></div>
+    <div class="rule-row"><span class="rule-icon">📦</span><p class="rule-text" data-i18n="rule4"></p></div>
+    <div class="rule-row"><span class="rule-icon">🚫</span><p class="rule-text" data-i18n="rule5"></p></div>
+    <div class="rule-row"><span class="rule-icon">💯</span><p class="rule-text" data-i18n="rule6"></p></div>
+    <div class="rule-row"><span class="rule-icon">🏆</span><p class="rule-text" data-i18n="rule7"></p></div>
+  </div>
+
+  <!-- ══ SETTINGS ══ -->
+  <div id="scrSet" class="scr sub-screen" style="overflow-y:auto">
+    <button class="btn-back" onclick="go('scrMenu')">← <span data-i18n="back"></span></button>
+    <div class="settings-title" data-i18n="settings"></div>
+
+    <div class="setting-row">
+      <span class="setting-label" data-i18n="soundLbl"></span>
+      <div id="togSnd" class="toggle" onclick="toggleSound()"><div id="togKnob" class="toggle-knob"></div></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label" data-i18n="timerLbl"></span>
+      <div id="togTimer" class="toggle off" onclick="toggleTimerSetting()"><div id="togTimerKnob" class="toggle-knob"></div></div>
+    </div>
+    <div id="timerDurRow" class="setting-row" style="display:none">
+      <span class="setting-label" data-i18n="timerDurLbl"></span>
+      <div class="seg-btns">
+        <button class="seg-btn active" id="tdur30" onclick="setTimerDur(30,this)">30s</button>
+        <button class="seg-btn" id="tdur60" onclick="setTimerDur(60,this)">60s</button>
+        <button class="seg-btn" id="tdur90" onclick="setTimerDur(90,this)">90s</button>
+      </div>
+    </div>
+
+    <div class="color-swatches-row">
+      <div class="color-swatches-label" data-i18n="boardColor"></div>
+      <div class="color-swatches" id="colorSwatches">
+        <div class="color-swatch active" style="background:#1d5c38" data-color="green"  onclick="setColor('green',this)"><span data-i18n="colorForest"></span></div>
+        <div class="color-swatch"        style="background:#1a2a52" data-color="navy"   onclick="setColor('navy',this)"><span data-i18n="colorNavy"></span></div>
+        <div class="color-swatch"        style="background:#521820" data-color="maroon" onclick="setColor('maroon',this)"><span data-i18n="colorMaroon"></span></div>
+        <div class="color-swatch"        style="background:#283040" data-color="slate"  onclick="setColor('slate',this)"><span data-i18n="colorSlate"></span></div>
+        <div class="color-swatch"        style="background:#2d1b4e" data-color="purple" onclick="setColor('purple',this)"><span data-i18n="colorPurple"></span></div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <span class="setting-label" data-i18n="languageLbl"></span>
+      <div class="seg-btns">
+        <button class="seg-btn" id="slng-en" onclick="setLang('en')">EN</button>
+        <button class="seg-btn" id="slng-fr" onclick="setLang('fr')">FR</button>
+        <button class="seg-btn" id="slng-ar" onclick="setLang('ar')">AR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GAME SCREEN ══ -->
+  <div id="scrGame" class="scr">
+    <div id="topBar">
+      <div class="top-logo">LWA3RIN</div>
+      <div id="topMsg">▶ YOUR TURN</div>
+      <div class="top-actions">
+        <div id="timerBadge" style="display:none">
+          <svg class="timer-svg" viewBox="0 0 36 36">
+            <circle class="timer-bg" cx="18" cy="18" r="15"/>
+            <circle class="timer-arc" id="timerArc" cx="18" cy="18" r="15"/>
+          </svg>
+          <span id="timerNum">30</span>
+        </div>
+        <button id="btnChat" class="btn-icon" onclick="toggleChat()">💬</button>
+        <button id="btnPass" onclick="playerPass()" data-i18n="pass" style="display:none"></button>
+        <button id="btnPause" class="btn-icon" onclick="pauseOn()">⏸</button>
+      </div>
+    </div>
+
+    <!-- Chat panel (slides down) -->
+    <div id="chatPanel" class="chat-panel" style="display:none">
+      <div id="chatMsgs" class="chat-msgs"></div>
+      <div class="quick-btns" id="quickBtns"></div>
+      <div class="chat-row">
+        <input id="chatInp" class="chat-input" maxlength="60" onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="chat-send" onclick="sendChat()">➤</button>
+      </div>
+    </div>
+
+    <div id="oppsArea" style="display:none"><div id="oppsRow"></div></div>
+    <div id="aiArea">
+      <div class="ai-label">🤖 AI — <span id="aiCnt">0</span> <span data-i18n="tilesLbl"></span> · PIPS: <span id="aiPip">0</span></div>
+      <div id="aiHand"></div>
+    </div>
+
+    <div id="statusBar">
+      <span class="status-boneyard">🎴 <b id="byCnt">0</b></span>
+      <div class="status-turn"><div id="tDot"></div><span id="tLbl">...</span></div>
+      <span id="scoreDisp"></span>
+    </div>
+
+    <!-- Draw mode score goal bar -->
+    <div id="goalBar" style="display:none">
+      <div id="goalInner"></div>
+    </div>
+
+    <div id="boardArea">
+      <div id="emptyBoard" data-i18n="tapToStart"></div>
+      <div id="boardRow" style="display:none">
+        <div id="dropL" class="drop-zone" style="display:none">◀</div>
+        <div id="bTiles"></div>
+        <div id="dropR" class="drop-zone">▶</div>
+      </div>
+      <div id="boneyard" onclick="playerDraw()">
+        <div class="bone-stack">
+          <div class="bone-card"></div><div class="bone-card"></div><div class="bone-card"></div>
+        </div>
+        <div id="boneCnt">0</div>
+        <div class="bone-lbl" data-i18n="draw"></div>
+      </div>
+    </div>
+
+    <div id="playerArea">
+      <div id="handLabel"></div>
+      <div id="playerHand"></div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- ══ HANDOFF ══ -->
+<div id="handoffOvl" class="ovl" style="display:none">
+  <div class="handoff-inner">
+    <div id="hoEmoji">🎴</div>
+    <div id="hoName">PLAYER 1</div>
+    <div class="ho-turn" data-i18n="yourTurn"></div>
+    <div id="hoTileCount"></div>
+    <div class="ho-hint" data-i18n="passHint"></div>
+    <button id="btnReveal" onclick="handoffReveal()" data-i18n="revealHand"></button>
+  </div>
+</div>
+
+<!-- ══ PAUSE ══ -->
+<div id="povl" class="ovl" style="display:none">
+  <div class="pause-box">
+    <div class="pause-emoji">⏸</div>
+    <div class="pause-title" data-i18n="paused"></div>
+    <button class="btn-gold" onclick="pauseOff()" data-i18n="resume"></button>
+    <button class="btn-dark" onclick="restartGame()" data-i18n="restart"></button>
+    <button class="btn-dark" onclick="goMenu()" data-i18n="mainMenu"></button>
+  </div>
+</div>
+
+<!-- ══ CHOOSE SIDE ══ -->
+<div id="csovl" class="ovl" style="display:none">
+  <div class="choose-box">
+    <div class="choose-label" data-i18n="whichEnd"></div>
+    <div id="csPrev"></div>
+    <div class="choose-btns">
+      <button class="btn-choose" onclick="pickSide('left')">◀ <span data-i18n="left"></span> [<span id="csLv">0</span>]</button>
+      <button class="btn-choose" onclick="pickSide('right')"><span data-i18n="right"></span> [<span id="csRv">0</span>] ▶</button>
+    </div>
+    <button class="btn-cancel" onclick="csCancel()" data-i18n="cancel"></button>
+  </div>
+</div>
+
+<!-- ══ ROUND OVER (Draw mode) ══ -->
+<div id="roundOvl" class="ovl" style="display:none">
+  <div class="round-box">
+    <div class="round-emoji">🏅</div>
+    <div id="roundTitle" class="round-title"></div>
+    <div id="roundSub" class="round-sub"></div>
+    <div id="roundScores"></div>
+    <button class="btn-gold" onclick="nextRound()" data-i18n="nextRound"></button>
+  </div>
+</div>
+
+<!-- ══ GAME OVER ══ -->
+<div id="govl" class="ovl" style="display:none">
+  <div class="gameover-inner">
+    <div id="goEmoji">🏆</div>
+    <div id="goTitle" data-i18n="victory"></div>
+    <div id="goSub"></div>
+    <div id="goReason"></div>
+    <div id="goPanel"><div class="go-scoreboard-title" data-i18n="scoreboard"></div></div>
+    <div class="gameover-btns">
+      <button class="btn-rematch" onclick="restartGame()" data-i18n="rematch"></button>
+      <button class="btn-menu" onclick="goMenu()" data-i18n="mainMenu"></button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
