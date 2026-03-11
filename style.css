@@ -190,13 +190,14 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 .goal-val{width:30px;text-align:right;font-family:monospace;color:#8898a8}
 
 /* ── BOARD AREA ────────────────────────────────────────── */
-#boardArea{flex:1;position:relative;overflow:hidden}
-#emptyBoard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.16);border-radius:12px;padding:16px 32px;color:rgba(255,255,255,.25);font-size:11px;letter-spacing:2px;text-align:center;font-family:monospace;cursor:pointer;transition:all .15s}
+#boardArea{flex:1;position:relative;overflow:auto;scrollbar-width:none}
+#boardArea::-webkit-scrollbar{display:none}
+#emptyBoard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.16);border-radius:12px;padding:16px 32px;color:rgba(255,255,255,.25);font-size:11px;letter-spacing:2px;text-align:center;font-family:monospace;cursor:pointer;transition:all .15s;white-space:pre-line}
 #emptyBoard.drag-over{border-color:rgba(245,200,66,.7);color:rgba(245,200,66,.9);background:rgba(245,200,66,.06)}
-#boardRow{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);align-items:center;gap:3px;overflow-x:auto;padding:20px 60px;scrollbar-width:none}
-.drop-zone{flex-shrink:0;border-radius:8px;border:2px dashed rgba(255,255,255,.18);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.22);font-size:20px;cursor:pointer;transition:all .15s}
-.drop-zone.drag-over{border-color:#f5c842;color:#f5c842;background:rgba(245,200,66,.14)}
-#bTiles{display:flex;gap:3px;align-items:center;flex-shrink:0}
+#boardRow{position:relative;min-width:100%;min-height:100%}
+.drop-zone{position:absolute;border-radius:8px;border:2px dashed rgba(255,255,255,.28);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:16px;cursor:pointer;transition:all .15s;z-index:5;min-width:34px;min-height:34px}
+.drop-zone.drag-over{border-color:#f5c842;color:#f5c842;background:rgba(245,200,66,.18)}
+#bTiles{position:absolute;inset:0;}
 
 /* ── BONEYARD ──────────────────────────────────────────── */
 #boneyard{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:default;z-index:6;user-select:none;opacity:.35;transition:opacity .2s;pointer-events:none}
