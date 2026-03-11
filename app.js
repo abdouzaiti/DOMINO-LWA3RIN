@@ -686,10 +686,11 @@ function buildQuickPhrases() {
    10. RENDER
    ───────────────────────────────────────────────────────── */
 /* ── SNAKING BOARD RENDERER ─────────────────────────────────
-   Snake layout — tiles placed on an absolute-positioned canvas.
-   boardRow is sized exactly to the chain bounding box.
-   boardArea (flex center) centers boardRow automatically.
-   Auto-scale when chain > area.
+   Structure:
+     boardArea  (flex, centers boardRow)
+       boardRow   (sized exactly to chain, flex-centered, tiles inside)
+       bTiles     (absolute overlay on boardArea for tiles)
+       dropL/R    (absolute overlay on boardArea for drop zones)
    ─────────────────────────────────────────────────────────── */
 function renderBoard() {
   var emptyEl = document.getElementById('emptyBoard');
@@ -704,7 +705,6 @@ function renderBoard() {
   if (board.length === 0) {
     emptyEl.style.display = 'block';
     rowEl.style.display   = 'none';
-    rowEl.style.transform = '';
     dropLEl.style.display = 'none';
     dropREl.style.display = 'none';
     return;
@@ -712,71 +712,38 @@ function renderBoard() {
   emptyEl.style.display = 'none';
   rowEl.style.display   = 'block';
 
-  /* ── tile sizes ─────────────────────────────────────── */
-  var S   = 28;           // one pip-face square (px)
-  var GAP = 3;            // gap between tiles
-  var TL  = S * 2 + GAP; // long side of normal tile (59px)
-  var TS  = S;            // short side (28px)
-  var PAD = 10;           // canvas padding
+  /* ── sizes ─────────────────────────────────────────── */
+  var S   = 28;           // one pip-face square px
+  var GAP = 3;
+  var TL  = S * 2 + GAP; // normal tile long side = 59
+  var TS  = S;            // normal tile short side = 28
+  var PAD = 12;
 
   var areaW = boardEl.clientWidth  || 320;
   var areaH = boardEl.clientHeight || 240;
 
-  /* how many normal tiles fit across the board width */
   var perRow = Math.max(3, Math.floor((areaW - PAD * 2) / (TL + GAP)));
 
-  /* ── layout pass ─────────────────────────────────────
-     Walk board[] left→right in array order.
-     cx,cy = pixel top-left of current tile.
-     dir = 'right' | 'left'
-     col = tiles laid in current horizontal run (0-based)
-  ────────────────────────────────────────────────────── */
+  /* ── compute positions ──────────────────────────────── */
   var positions = [];
-  var cx = 0, cy = 0;
-  var dir = 'right';
-  var col = 0;             // position within current horizontal run
+  var cx = 0, cy = 0, dir = 'right', col = 0;
 
   for (var i = 0; i < board.length; i++) {
-    var bt       = board[i];
+    var bt = board[i];
     var isDouble = (bt.sA === bt.sB);
-
-    /* last slot in the run acts as the corner connector */
     var isCorner = (col === perRow - 1) && (i < board.length - 1);
+    var orient   = (isCorner || isDouble) ? 'V' : 'H';
+    var tW = (orient === 'H') ? TL : TS;
+    var tH = (orient === 'H') ? TS : TL;
 
-    /* orientation: corner → V, double → V, normal → H */
-    var orient = (isCorner || isDouble) ? 'V' : 'H';
-    var tW     = (orient === 'H') ? TL : TS;
-    var tH     = (orient === 'H') ? TS : TL;
-
-    /* For left-going row, corner tile must sit flush at the LEFT end of the row.
-       Calculate that position: leftmost-tile-x minus corner-width-and-gap */
-    if (isCorner && dir === 'left') {
-      /* cx is currently advancing left; the corner sits at the far-left end.
-         The left anchor is where normal left-going tiles would end up. */
-      cx = cx;  // cx is already at the correct left position after last advance
-    }
-
-    positions.push({ px: cx, py: cy, orient: orient,
-                     isCorner: isCorner, dir: dir, tW: tW, tH: tH });
+    positions.push({ px: cx, py: cy, orient: orient, isCorner: isCorner, dir: dir, tW: tW, tH: tH });
 
     if (isCorner) {
-      var anchorX = cx; // left edge of corner tile
-
-      cy  += TL + GAP;  // drop one row
-      col  = 0;
-
-      if (dir === 'right') {
-        /* was going right → now go LEFT.
-           Corner is at the RIGHT end. Next row starts just left of corner. */
-        dir = 'left';
-        /* first tile of next row: right edge aligns with corner right edge */
-        cx  = anchorX + tW - TL;
-      } else {
-        /* was going left → now go RIGHT.
-           Corner is at the LEFT end. Next row starts just right of corner. */
-        dir = 'right';
-        cx  = anchorX;  // first tile of next row starts at corner left edge
-      }
+      var ax = cx;
+      cy += TL + GAP;
+      col = 0;
+      if (dir === 'right') { dir = 'left';  cx = ax + tW - TL; }
+      else                 { dir = 'right'; cx = ax; }
     } else {
       col++;
       cx += (dir === 'right') ? tW + GAP : -(tW + GAP);
@@ -784,8 +751,7 @@ function renderBoard() {
   }
 
   /* ── bounding box ───────────────────────────────────── */
-  var minX = Infinity, maxX = -Infinity;
-  var minY = Infinity, maxY = -Infinity;
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   positions.forEach(function(p) {
     if (p.px        < minX) minX = p.px;
     if (p.py        < minY) minY = p.py;
@@ -793,58 +759,71 @@ function renderBoard() {
     if (p.py + p.tH > maxY) maxY = p.py + p.tH;
   });
 
-  var chainW = (maxX - minX) + PAD * 2;
-  var chainH = (maxY - minY) + PAD * 2;
+  var chainW = maxX - minX + PAD * 2;
+  var chainH = maxY - minY + PAD * 2;
 
-  /* ── auto-scale ─────────────────────────────────────── */
-  var scale = Math.min(1,
-    (areaW / chainW) * 0.97,
-    (areaH / chainH) * 0.97
-  );
+  /* ── scale ──────────────────────────────────────────── */
+  var scale = Math.min(1, (areaW / chainW) * 0.97, (areaH / chainH) * 0.97);
 
-  /* boardRow sized to chain; boardArea flex-centers it */
-  rowEl.style.width          = chainW + 'px';
-  rowEl.style.height         = chainH + 'px';
-  rowEl.style.transform      = scale < 1 ? 'scale(' + scale.toFixed(4) + ')' : '';
-  rowEl.style.transformOrigin = 'center center';
+  /* ── size boardRow (the flex-centered placeholder) ───── */
+  var visW = chainW * scale;
+  var visH = chainH * scale;
+  rowEl.style.width  = visW + 'px';
+  rowEl.style.height = visH + 'px';
 
-  /* offset so all tiles land inside the padded canvas */
-  var offX = -minX + PAD;
-  var offY = -minY + PAD;
+  /* ── draw tiles + drop zones after browser lays out boardRow ── */
+  /* Use requestAnimationFrame so boardRow's flex position is committed */
+  (function drawAfterLayout(positions, minX, minY, scale, visW, visH) {
+    requestAnimationFrame(function() {
+      var boardRect = boardEl.getBoundingClientRect();
+      var rowRect   = rowEl.getBoundingClientRect();
+      var tileLeft  = rowRect.left - boardRect.left;
+      var tileTop   = rowRect.top  - boardRect.top;
 
-  /* ── render tiles ───────────────────────────────────── */
-  positions.forEach(function(pos, i) {
-    var bt = board[i];
-    var el = makeTile(bt.sA, bt.sB, pos.orient, S);
-    if (i === board.length - 1)
-      el.style.animation = 'tileIn .28s cubic-bezier(.34,1.56,.64,1)';
-    el.style.position = 'absolute';
-    el.style.left     = (pos.px + offX) + 'px';
-    el.style.top      = (pos.py + offY) + 'px';
-    tilesEl.appendChild(el);
-  });
+      tilesEl.style.position = 'absolute';
+      tilesEl.style.left     = tileLeft + 'px';
+      tilesEl.style.top      = tileTop  + 'px';
+      tilesEl.style.width    = visW + 'px';
+      tilesEl.style.height   = visH + 'px';
 
-  /* ── drop zones ─────────────────────────────────────── */
-  var fp = positions[0];
-  var lp = positions[positions.length - 1];
+      var offX   = (-minX + PAD) * scale;
+      var offY   = (-minY + PAD) * scale;
+      var scaledS = Math.max(16, Math.round(S * scale));
 
-  function dz(el, x, y) {
-    el.style.display  = 'flex';
-    el.style.position = 'absolute';
-    el.style.width    = '24px';
-    el.style.height   = '24px';
-    el.style.left     = Math.round(x) + 'px';
-    el.style.top      = Math.round(y) + 'px';
-  }
+      tilesEl.innerHTML = '';
 
-  var fX = fp.px + offX, fY = fp.py + offY;
-  if (fp.dir === 'right') dz(dropLEl, fX - 28,         fY + (fp.tH - 24) / 2);
-  else                    dz(dropLEl, fX + fp.tW + 4,  fY + (fp.tH - 24) / 2);
+      positions.forEach(function(pos, i) {
+        var bt = board[i];
+        var el = makeTile(bt.sA, bt.sB, pos.orient, scaledS);
+        if (i === board.length - 1)
+          el.style.animation = 'tileIn .28s cubic-bezier(.34,1.56,.64,1)';
+        el.style.position = 'absolute';
+        el.style.left     = Math.round(pos.px * scale + offX) + 'px';
+        el.style.top      = Math.round(pos.py * scale + offY) + 'px';
+        tilesEl.appendChild(el);
+      });
 
-  var lX = lp.px + offX, lY = lp.py + offY;
-  if (lp.isCorner)             dz(dropREl, lX + (lp.tW-24)/2, lY + lp.tH + 4);
-  else if (lp.dir === 'right') dz(dropREl, lX + lp.tW + 4,   lY + (lp.tH-24)/2);
-  else                         dz(dropREl, lX - 28,           lY + (lp.tH-24)/2);
+      var fp = positions[0];
+      var lp = positions[positions.length - 1];
+      var dzS = 24;
+
+      function placeDZ(el, gx, gy) {
+        el.style.display  = 'flex';
+        el.style.position = 'absolute';
+        el.style.left     = Math.round(tileLeft + gx * scale + offX) + 'px';
+        el.style.top      = Math.round(tileTop  + gy * scale + offY) + 'px';
+        el.style.width    = dzS + 'px';
+        el.style.height   = dzS + 'px';
+      }
+
+      if (fp.dir === 'right') placeDZ(dropLEl, fp.px - dzS - 2, fp.py + (fp.tH - dzS) / 2);
+      else                    placeDZ(dropLEl, fp.px + fp.tW + 2, fp.py + (fp.tH - dzS) / 2);
+
+      if (lp.isCorner)             placeDZ(dropREl, lp.px + (lp.tW - dzS) / 2, lp.py + lp.tH + 2);
+      else if (lp.dir === 'right') placeDZ(dropREl, lp.px + lp.tW + 2, lp.py + (lp.tH - dzS) / 2);
+      else                         placeDZ(dropREl, lp.px - dzS - 2, lp.py + (lp.tH - dzS) / 2);
+    });
+  })(positions, minX, minY, scale, visW, visH);
 }
 
 
