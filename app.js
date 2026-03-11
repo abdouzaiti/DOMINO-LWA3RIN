@@ -741,7 +741,11 @@ function renderBoard() {
   /* ── place tiles ─────────────────────────────────── */
   layout.positions.forEach(function(pos, i) {
     var bt = board[i];
-    var el = makeTile(bt.sA, bt.sB, pos.orient, S);
+    /* When traveling LEFT, flip sA/sB so the connecting pip
+       always faces the correct direction (right side = connection) */
+    var tA = (pos.dir === 'left') ? bt.sB : bt.sA;
+    var tB = (pos.dir === 'left') ? bt.sA : bt.sB;
+    var el = makeTile(tA, tB, pos.orient, S);
     el.style.position = 'absolute';
     el.style.left     = pos.dx + 'px';
     el.style.top      = pos.dy + 'px';
