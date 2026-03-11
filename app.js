@@ -685,36 +685,186 @@ function buildQuickPhrases() {
 /* ─────────────────────────────────────────────────────────
    10. RENDER
    ───────────────────────────────────────────────────────── */
+/* ── SNAKING BOARD RENDERER ─────────────────────────────────
+   Tiles flow: RIGHT along row → corner tile turns DOWN →
+               LEFT along next row → corner tile turns DOWN → RIGHT ...
+   Doubles are always perpendicular to travel direction.
+   All tiles absolutely positioned inside #bTiles canvas.
+   ─────────────────────────────────────────────────────────── */
 function renderBoard() {
   var emptyEl = document.getElementById('emptyBoard');
   var rowEl   = document.getElementById('boardRow');
   var tilesEl = document.getElementById('bTiles');
   var dropLEl = document.getElementById('dropL');
-  var HALF    = 32;
+  var dropREl = document.getElementById('dropR');
+
   tilesEl.innerHTML = '';
+  dropLEl.style.display = 'none';
+  dropREl.style.display = 'none';
+
   if (board.length === 0) {
-    emptyEl.style.display='block'; rowEl.style.display='none'; return;
+    emptyEl.style.display = 'block';
+    rowEl.style.display   = 'none';
+    return;
   }
-  emptyEl.style.display='none'; rowEl.style.display='flex';
-  dropLEl.style.display='flex';
-  dropLEl.style.width=HALF+'px'; dropLEl.style.height=(HALF*2)+'px';
-  var dropREl=document.getElementById('dropR');
-  dropREl.style.width=HALF+'px'; dropREl.style.height=(HALF*2)+'px';
-  board.forEach(function(bt,i){
-    var el=makeTile(bt.sA,bt.sB,'H',HALF);
-    if(i===board.length-1) el.style.animation='tileIn .3s cubic-bezier(.34,1.56,.64,1)';
+  emptyEl.style.display = 'none';
+  rowEl.style.display   = 'block';
+
+  /* ── sizes ─────────────────────────────────────────────── */
+  var S   = 30;          // half-tile size (one pip-face square)
+  var GAP = 2;           // gap between tiles
+  var TH  = S * 2 + GAP; // long dimension of a normal tile
+  var TW  = S;           // short dimension
+  var PAD = 14;          // canvas padding
+
+  /* Available board width */
+  var boardEl = document.getElementById('boardArea');
+  var areaW   = boardEl.clientWidth  || 320;
+  var areaH   = boardEl.clientHeight || 240;
+
+  /* How many tiles fit per horizontal row */
+  var perRow = Math.max(3, Math.floor((areaW - PAD * 2) / (TH + GAP)));
+
+  /* ── compute tile positions ─────────────────────────────── */
+  /*
+    Each position: { px, py, orient:'H'|'V', isCorner, cornerDir:'down' }
+    We walk through the board array and assign pixel positions.
+
+    State machine:
+      dir = 'right' | 'left'          (current horizontal travel)
+      px, py = top-left pixel of current tile
+      col = how many tiles placed in this horizontal run
+  */
+  var positions = [];
+  var px = PAD, py = PAD;
+  var dir = 'right';
+  var col = 0; // tiles placed in current row
+
+  for (var i = 0; i < board.length; i++) {
+    var bt       = board[i];
+    var isDouble = (bt.sA === bt.sB);
+
+    /* Is this tile a corner (last in its row, about to turn)? */
+    var isCorner = (col === perRow - 1) && (i < board.length - 1);
+
+    /* Orient:
+       - Normal tile in horizontal run → 'H'
+       - Double in horizontal run      → 'V' (perpendicular = vertical)
+       - Corner tile (connecting rows) → 'V' always (it's the turn piece)
+    */
+    var orient;
+    if (isCorner) {
+      orient = 'V'; // corner connector is always vertical
+    } else {
+      orient = isDouble ? 'V' : 'H';
+    }
+
+    positions.push({ px: px, py: py, orient: orient, isCorner: isCorner, dir: dir });
+
+    /* Advance pixel position */
+    if (isCorner) {
+      /* Corner tile: it occupies TW wide × TH tall, then we move down */
+      var nextPy = py + TH + GAP;    /* row below */
+      /* next tile starts at same x-column edge but row below */
+      py = nextPy;
+      col = 0;
+      dir = (dir === 'right') ? 'left' : 'right';
+    } else {
+      col++;
+      if (dir === 'right') {
+        px += (orient === 'V' ? TW : TH) + GAP;
+      } else {
+        px -= (orient === 'V' ? TW : TH) + GAP;
+      }
+    }
+  }
+
+  /* ── canvas bounding box ────────────────────────────────── */
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  positions.forEach(function(p) {
+    var w = (p.orient === 'H') ? TH : TW;
+    var h = (p.orient === 'H') ? TW : TH;
+    if (p.px       < minX) minX = p.px;
+    if (p.py       < minY) minY = p.py;
+    if (p.px + w   > maxX) maxX = p.px + w;
+    if (p.py + h   > maxY) maxY = p.py + h;
+  });
+  var canvasW = maxX + PAD;
+  var canvasH = maxY + PAD;
+
+  rowEl.style.width    = Math.max(canvasW, areaW)  + 'px';
+  rowEl.style.height   = Math.max(canvasH, areaH)  + 'px';
+  rowEl.style.position = 'relative';
+
+  /* ── draw tiles ──────────────────────────────────────────── */
+  positions.forEach(function(pos, i) {
+    var bt  = board[i];
+    var el  = makeTile(bt.sA, bt.sB, pos.orient, S);
+    if (i === board.length - 1) {
+      el.style.animation = 'tileIn .3s cubic-bezier(.34,1.56,.64,1)';
+    }
+    el.style.position = 'absolute';
+    el.style.left     = pos.px + 'px';
+    el.style.top      = pos.py + 'px';
     tilesEl.appendChild(el);
   });
-  setTimeout(function(){
-    var row=document.getElementById('boardRow');
-    row.scrollLeft=(row.scrollWidth-row.clientWidth)/2;
-  },50);
+
+  /* ── drop zones ──────────────────────────────────────────── */
+  var fp = positions[0];
+  var lp = positions[positions.length - 1];
+
+  /* Left-end drop zone: to the left/right of first tile */
+  var lW = (fp.orient === 'H') ? TH : TW;
+  var lH = (fp.orient === 'H') ? TW : TH;
+  dropLEl.style.display  = 'flex';
+  dropLEl.style.position = 'absolute';
+  dropLEl.style.width    = '28px';
+  dropLEl.style.height   = '28px';
+  if (fp.dir === 'right') {
+    dropLEl.style.left = (fp.px - 32) + 'px';
+    dropLEl.style.top  = (fp.py + lH / 2 - 14) + 'px';
+  } else {
+    dropLEl.style.left = (fp.px + lW + 4) + 'px';
+    dropLEl.style.top  = (fp.py + lH / 2 - 14) + 'px';
+  }
+
+  /* Right-end drop zone: after last tile */
+  var rW = (lp.orient === 'H') ? TH : TW;
+  var rH = (lp.orient === 'H') ? TW : TH;
+  dropREl.style.display  = 'flex';
+  dropREl.style.position = 'absolute';
+  dropREl.style.width    = '28px';
+  dropREl.style.height   = '28px';
+  if (lp.isCorner) {
+    /* last tile was a corner → next goes down */
+    dropREl.style.left = (lp.px + rW / 2 - 14) + 'px';
+    dropREl.style.top  = (lp.py + TH + 4)       + 'px';
+  } else if (lp.dir === 'right') {
+    dropREl.style.left = (lp.px + rW + 4) + 'px';
+    dropREl.style.top  = (lp.py + rH / 2 - 14) + 'px';
+  } else {
+    dropREl.style.left = (lp.px - 32) + 'px';
+    dropREl.style.top  = (lp.py + rH / 2 - 14) + 'px';
+  }
+
+  /* Scroll to show the latest tile */
+  setTimeout(function() {
+    var lp2 = positions[positions.length - 1];
+    boardEl.scrollLeft = lp2.px - areaW / 2 + S;
+    boardEl.scrollTop  = lp2.py - areaH / 2 + S;
+  }, 60);
 }
+
 
 function renderCurrentHand() {
   var p=players[curPlayer];
   var handEl=document.getElementById('playerHand');
   handEl.innerHTML='';
+  // NEVER show AI tiles face-up
+  if(p.isAI){
+    document.getElementById('handLabel').innerHTML='';
+    return;
+  }
   var playIds={};
   p.hand.filter(function(t){return canPlay(t,L,R);}).forEach(function(t){playIds[t.id]=1;});
   p.hand.forEach(function(t,i){
