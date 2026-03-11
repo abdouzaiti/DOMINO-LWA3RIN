@@ -190,14 +190,14 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 .goal-val{width:30px;text-align:right;font-family:monospace;color:#8898a8}
 
 /* ── BOARD AREA ────────────────────────────────────────── */
-#boardArea{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:0;}
+#boardArea{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #boardArea::-webkit-scrollbar{display:none}
 #emptyBoard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.16);border-radius:12px;padding:16px 32px;color:rgba(255,255,255,.25);font-size:11px;letter-spacing:2px;text-align:center;font-family:monospace;cursor:pointer;transition:all .15s;white-space:pre-line}
 #emptyBoard.drag-over{border-color:rgba(245,200,66,.7);color:rgba(245,200,66,.9);background:rgba(245,200,66,.06)}
-#boardRow{flex-shrink:0;display:block;}
-.drop-zone{position:absolute;border-radius:8px;border:2px dashed rgba(255,255,255,.28);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:14px;cursor:pointer;transition:all .15s;z-index:5;}
+
+.drop-zone{position:absolute;border-radius:8px;border:2px dashed rgba(255,255,255,.3);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);font-size:13px;cursor:pointer;transition:all .15s;z-index:5}
 .drop-zone.drag-over{border-color:#f5c842;color:#f5c842;background:rgba(245,200,66,.18)}
-#bTiles{position:absolute;pointer-events:none;}
+
 
 /* ── BONEYARD ──────────────────────────────────────────── */
 #boneyard{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default;z-index:6;user-select:none;opacity:.35;transition:opacity .2s;pointer-events:none}
@@ -273,3 +273,5 @@ body{background:#0c1018;font-family:'Segoe UI',system-ui,sans-serif;overflow:hid
 /* ── PASS BUTTON (bottom, always visible) ───────────────── */
 #btnPass{display:block;width:calc(100% - 16px);margin:4px 8px 2px;padding:8px 0;border-radius:10px;border:1.5px solid #c0392b;background:rgba(192,57,43,.04);color:rgba(231,76,60,.35);font-size:13px;font-weight:900;letter-spacing:2px;transition:opacity .25s,background .25s,box-shadow .25s;border:none;outline:none}
 #btnPass:active{transform:scale(0.97)}
+
+#boardRow{position:relative;flex-shrink:0}
