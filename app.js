@@ -741,10 +741,14 @@ function renderBoard() {
   /* ── place tiles ─────────────────────────────────── */
   layout.positions.forEach(function(pos, i) {
     var bt = board[i];
-    /* When traveling LEFT, flip sA/sB so the connecting pip
-       always faces the correct direction (right side = connection) */
-    var tA = (pos.dir === 'left') ? bt.sB : bt.sA;
-    var tB = (pos.dir === 'left') ? bt.sA : bt.sB;
+    /* Flip sA↔sB for left-going tiles so the connecting pip
+       always faces the correct neighbor.
+       - H tile going left: flip so right-side = connecting pip ✓
+       - Corner (V): never flip — top always connects up/right, bottom connects down/right
+       - Double (V) going left: flip has no visual effect but keep consistent */
+    var flip = (pos.dir === 'left') && !pos.isCorner;
+    var tA = flip ? bt.sB : bt.sA;
+    var tB = flip ? bt.sA : bt.sB;
     var el = makeTile(tA, tB, pos.orient, S);
     el.style.position = 'absolute';
     el.style.left     = pos.dx + 'px';
@@ -818,11 +822,15 @@ function computeSnakeLayout(S, areaW, areaH) {
       cy += TL + GAP;
       col = 0;
       if (dir === 'right') {
+        /* was going right → now LEFT.
+           Corner at right end. First left-going tile right-aligns with corner. */
         dir = 'left';
-        cx  = ax + tW - TL;  /* next row right-aligns with corner */
+        cx  = ax + tW - TL;  /* first tile: right-edge = corner right-edge */
       } else {
+        /* was going left → now RIGHT.
+           Corner at left end. First right-going tile starts at corner right edge. */
         dir = 'right';
-        cx  = ax;             /* next row left-aligns with corner */
+        cx  = ax + TS;       /* first tile: left-edge = corner right-edge */
       }
     } else {
       col++;
