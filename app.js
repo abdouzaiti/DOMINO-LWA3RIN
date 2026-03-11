@@ -685,145 +685,170 @@ function buildQuickPhrases() {
 /* ─────────────────────────────────────────────────────────
    10. RENDER
    ───────────────────────────────────────────────────────── */
-/* ── SNAKING BOARD RENDERER ─────────────────────────────────
-   Structure:
-     boardArea  (flex, centers boardRow)
-       boardRow   (sized exactly to chain, flex-centered, tiles inside)
-       bTiles     (absolute overlay on boardArea for tiles)
-       dropL/R    (absolute overlay on boardArea for drop zones)
+/* ── SNAKING BOARD RENDERER ────────────────────────────────
+   HOW IT WORKS:
+   - boardRow  is a position:relative div inside boardArea
+   - boardArea is display:flex with align/justify center
+   - We set boardRow width+height = exact chain bounding box
+   - boardArea's flex centering places boardRow in the middle
+   - Tiles and drop zones are position:absolute inside boardRow
+   - If chain too big: shrink tile size (S) until it fits
    ─────────────────────────────────────────────────────────── */
 function renderBoard() {
   var emptyEl = document.getElementById('emptyBoard');
   var rowEl   = document.getElementById('boardRow');
-  var tilesEl = document.getElementById('bTiles');
   var dropLEl = document.getElementById('dropL');
   var dropREl = document.getElementById('dropR');
   var boardEl = document.getElementById('boardArea');
 
-  tilesEl.innerHTML = '';
+  /* clear previous tiles (all direct children except drop zones) */
+  var kids = Array.prototype.slice.call(rowEl.children);
+  kids.forEach(function(k) {
+    if (k !== dropLEl && k !== dropREl) rowEl.removeChild(k);
+  });
+  dropLEl.style.display = 'none';
+  dropREl.style.display = 'none';
 
   if (board.length === 0) {
     emptyEl.style.display = 'block';
     rowEl.style.display   = 'none';
-    dropLEl.style.display = 'none';
-    dropREl.style.display = 'none';
     return;
   }
   emptyEl.style.display = 'none';
   rowEl.style.display   = 'block';
 
-  /* ── sizes ─────────────────────────────────────────── */
-  var S   = 28;           // one pip-face square px
-  var GAP = 3;
-  var TL  = S * 2 + GAP; // normal tile long side = 59
-  var TS  = S;            // normal tile short side = 28
-  var PAD = 12;
-
   var areaW = boardEl.clientWidth  || 320;
   var areaH = boardEl.clientHeight || 240;
 
+  /* ── try tile sizes from 28 down until chain fits ─── */
+  var S = 28;
+  var layout;
+
+  while (S >= 12) {
+    layout = computeSnakeLayout(S, areaW, areaH);
+    if (layout.chainW <= areaW * 0.98 && layout.chainH <= areaH * 0.98) break;
+    S -= 2;
+  }
+
+  /* ── size boardRow exactly to chain ──────────────── */
+  rowEl.style.width  = layout.chainW + 'px';
+  rowEl.style.height = layout.chainH + 'px';
+
+  /* ── place tiles ─────────────────────────────────── */
+  layout.positions.forEach(function(pos, i) {
+    var bt = board[i];
+    var el = makeTile(bt.sA, bt.sB, pos.orient, S);
+    el.style.position = 'absolute';
+    el.style.left     = pos.dx + 'px';
+    el.style.top      = pos.dy + 'px';
+    if (i === board.length - 1)
+      el.style.animation = 'tileIn .28s cubic-bezier(.34,1.56,.64,1)';
+    rowEl.appendChild(el);
+  });
+
+  /* ── drop zones ──────────────────────────────────── */
+  var fp  = layout.positions[0];
+  var lp  = layout.positions[layout.positions.length - 1];
+  var dzS = Math.max(18, S - 4);
+
+  function showDZ(el, x, y) {
+    el.style.display  = 'flex';
+    el.style.position = 'absolute';
+    el.style.width    = dzS + 'px';
+    el.style.height   = dzS + 'px';
+    el.style.left     = x + 'px';
+    el.style.top      = y + 'px';
+  }
+
+  /* left end */
+  if (fp.dir === 'right')
+    showDZ(dropLEl, fp.dx - dzS - 3, fp.dy + (fp.tH - dzS) / 2);
+  else
+    showDZ(dropLEl, fp.dx + fp.tW + 3, fp.dy + (fp.tH - dzS) / 2);
+
+  /* right end */
+  if (lp.isCorner)
+    showDZ(dropREl, lp.dx + (lp.tW - dzS) / 2, lp.dy + lp.tH + 3);
+  else if (lp.dir === 'right')
+    showDZ(dropREl, lp.dx + lp.tW + 3, lp.dy + (lp.tH - dzS) / 2);
+  else
+    showDZ(dropREl, lp.dx - dzS - 3, lp.dy + (lp.tH - dzS) / 2);
+}
+
+/* ── Snake layout computation ────────────────────────────
+   Returns { positions[], chainW, chainH }
+   positions[i] = { dx, dy, orient, isCorner, dir, tW, tH }
+   dx, dy are already offset so minX=PAD, minY=PAD
+   ──────────────────────────────────────────────────────── */
+function computeSnakeLayout(S, areaW, areaH) {
+  var GAP = 3;
+  var TL  = S * 2 + GAP;  /* long side  */
+  var TS  = S;             /* short side */
+  var PAD = 10;
+
   var perRow = Math.max(3, Math.floor((areaW - PAD * 2) / (TL + GAP)));
 
-  /* ── compute positions ──────────────────────────────── */
-  var positions = [];
-  var cx = 0, cy = 0, dir = 'right', col = 0;
+  var raw = [];             /* raw positions before offset */
+  var cx = 0, cy = 0;
+  var dir = 'right';
+  var col = 0;
 
   for (var i = 0; i < board.length; i++) {
-    var bt = board[i];
+    var bt       = board[i];
     var isDouble = (bt.sA === bt.sB);
     var isCorner = (col === perRow - 1) && (i < board.length - 1);
     var orient   = (isCorner || isDouble) ? 'V' : 'H';
     var tW = (orient === 'H') ? TL : TS;
     var tH = (orient === 'H') ? TS : TL;
 
-    positions.push({ px: cx, py: cy, orient: orient, isCorner: isCorner, dir: dir, tW: tW, tH: tH });
+    raw.push({ px: cx, py: cy, orient: orient,
+               isCorner: isCorner, dir: dir, tW: tW, tH: tH });
 
     if (isCorner) {
+      /* corner: advance row, flip direction, anchor next row to corner */
       var ax = cx;
       cy += TL + GAP;
       col = 0;
-      if (dir === 'right') { dir = 'left';  cx = ax + tW - TL; }
-      else                 { dir = 'right'; cx = ax; }
+      if (dir === 'right') {
+        dir = 'left';
+        cx  = ax + tW - TL;  /* next row right-aligns with corner */
+      } else {
+        dir = 'right';
+        cx  = ax;             /* next row left-aligns with corner */
+      }
     } else {
       col++;
       cx += (dir === 'right') ? tW + GAP : -(tW + GAP);
     }
   }
 
-  /* ── bounding box ───────────────────────────────────── */
-  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  positions.forEach(function(p) {
+  /* bounding box */
+  var minX = Infinity, maxX = -Infinity;
+  var minY = Infinity, maxY = -Infinity;
+  raw.forEach(function(p) {
     if (p.px        < minX) minX = p.px;
     if (p.py        < minY) minY = p.py;
     if (p.px + p.tW > maxX) maxX = p.px + p.tW;
     if (p.py + p.tH > maxY) maxY = p.py + p.tH;
   });
 
-  var chainW = maxX - minX + PAD * 2;
-  var chainH = maxY - minY + PAD * 2;
+  /* apply offset so all coords are >= PAD */
+  var offX = -minX + PAD;
+  var offY = -minY + PAD;
 
-  /* ── scale ──────────────────────────────────────────── */
-  var scale = Math.min(1, (areaW / chainW) * 0.97, (areaH / chainH) * 0.97);
+  var positions = raw.map(function(p) {
+    return {
+      dx: p.px + offX,  dy: p.py + offY,
+      tW: p.tW,         tH: p.tH,
+      orient: p.orient, isCorner: p.isCorner, dir: p.dir
+    };
+  });
 
-  /* ── size boardRow (the flex-centered placeholder) ───── */
-  var visW = chainW * scale;
-  var visH = chainH * scale;
-  rowEl.style.width  = visW + 'px';
-  rowEl.style.height = visH + 'px';
-
-  /* ── draw tiles + drop zones after browser lays out boardRow ── */
-  /* Use requestAnimationFrame so boardRow's flex position is committed */
-  (function drawAfterLayout(positions, minX, minY, scale, visW, visH) {
-    requestAnimationFrame(function() {
-      var boardRect = boardEl.getBoundingClientRect();
-      var rowRect   = rowEl.getBoundingClientRect();
-      var tileLeft  = rowRect.left - boardRect.left;
-      var tileTop   = rowRect.top  - boardRect.top;
-
-      tilesEl.style.position = 'absolute';
-      tilesEl.style.left     = tileLeft + 'px';
-      tilesEl.style.top      = tileTop  + 'px';
-      tilesEl.style.width    = visW + 'px';
-      tilesEl.style.height   = visH + 'px';
-
-      var offX   = (-minX + PAD) * scale;
-      var offY   = (-minY + PAD) * scale;
-      var scaledS = Math.max(16, Math.round(S * scale));
-
-      tilesEl.innerHTML = '';
-
-      positions.forEach(function(pos, i) {
-        var bt = board[i];
-        var el = makeTile(bt.sA, bt.sB, pos.orient, scaledS);
-        if (i === board.length - 1)
-          el.style.animation = 'tileIn .28s cubic-bezier(.34,1.56,.64,1)';
-        el.style.position = 'absolute';
-        el.style.left     = Math.round(pos.px * scale + offX) + 'px';
-        el.style.top      = Math.round(pos.py * scale + offY) + 'px';
-        tilesEl.appendChild(el);
-      });
-
-      var fp = positions[0];
-      var lp = positions[positions.length - 1];
-      var dzS = 24;
-
-      function placeDZ(el, gx, gy) {
-        el.style.display  = 'flex';
-        el.style.position = 'absolute';
-        el.style.left     = Math.round(tileLeft + gx * scale + offX) + 'px';
-        el.style.top      = Math.round(tileTop  + gy * scale + offY) + 'px';
-        el.style.width    = dzS + 'px';
-        el.style.height   = dzS + 'px';
-      }
-
-      if (fp.dir === 'right') placeDZ(dropLEl, fp.px - dzS - 2, fp.py + (fp.tH - dzS) / 2);
-      else                    placeDZ(dropLEl, fp.px + fp.tW + 2, fp.py + (fp.tH - dzS) / 2);
-
-      if (lp.isCorner)             placeDZ(dropREl, lp.px + (lp.tW - dzS) / 2, lp.py + lp.tH + 2);
-      else if (lp.dir === 'right') placeDZ(dropREl, lp.px + lp.tW + 2, lp.py + (lp.tH - dzS) / 2);
-      else                         placeDZ(dropREl, lp.px - dzS - 2, lp.py + (lp.tH - dzS) / 2);
-    });
-  })(positions, minX, minY, scale, visW, visH);
+  return {
+    positions: positions,
+    chainW: maxX - minX + PAD * 2,
+    chainH: maxY - minY + PAD * 2
+  };
 }
 
 
