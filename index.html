@@ -220,11 +220,10 @@
 
     <div id="boardArea">
       <div id="emptyBoard" data-i18n="tapToStart"></div>
-      <div id="boardRow" style="display:none">
-        <div id="dropL" class="drop-zone" style="display:none">◀</div>
-        <div id="bTiles"></div>
-        <div id="dropR" class="drop-zone">▶</div>
-      </div>
+      <div id="boardRow" style="display:none"></div>
+      <div id="bTiles" style="position:absolute;top:0;left:0;width:0;height:0;"></div>
+      <div id="dropL" class="drop-zone" style="display:none">◀</div>
+      <div id="dropR" class="drop-zone" style="display:none">▶</div>
       <div id="boneyard" onclick="playerDraw()">
         <div class="bone-stack">
           <div class="bone-card"></div><div class="bone-card"></div><div class="bone-card"></div>
