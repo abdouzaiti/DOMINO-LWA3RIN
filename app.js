@@ -730,9 +730,13 @@ function renderBoard() {
     S -= 2;
   }
 
-  /* ── size boardRow exactly to chain ──────────────── */
-  rowEl.style.width  = layout.chainW + 'px';
-  rowEl.style.height = layout.chainH + 'px';
+  /* ── center boardRow absolutely inside boardArea ─── */
+  var chainW = layout.chainW;
+  var chainH = layout.chainH;
+  rowEl.style.width  = chainW + 'px';
+  rowEl.style.height = chainH + 'px';
+  rowEl.style.left   = Math.round((areaW - chainW) / 2) + 'px';
+  rowEl.style.top    = Math.round((areaH - chainH) / 2) + 'px';
 
   /* ── place tiles ─────────────────────────────────── */
   layout.positions.forEach(function(pos, i) {
