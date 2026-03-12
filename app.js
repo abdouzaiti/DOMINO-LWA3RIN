@@ -685,14 +685,12 @@ function buildQuickPhrases() {
 /* ─────────────────────────────────────────────────────────
    10. RENDER
    ───────────────────────────────────────────────────────── */
-/* ── SNAKING BOARD RENDERER ────────────────────────────────
-   HOW IT WORKS:
-   - boardRow  is a position:relative div inside boardArea
-   - boardArea is display:flex with align/justify center
-   - We set boardRow width+height = exact chain bounding box
-   - boardArea's flex centering places boardRow in the middle
-   - Tiles and drop zones are position:absolute inside boardRow
-   - If chain too big: shrink tile size (S) until it fits
+
+/* ── BOARD RENDERER ────────────────────────────────────────
+   boardRow  = position:absolute inside boardArea, JS-centered
+   Tiles     = position:absolute children of boardRow
+   Drop zones = position:absolute children of boardRow
+   Auto-shrinks tile size until chain fits the board area.
    ─────────────────────────────────────────────────────────── */
 function renderBoard() {
   var emptyEl = document.getElementById('emptyBoard');
@@ -701,7 +699,7 @@ function renderBoard() {
   var dropREl = document.getElementById('dropR');
   var boardEl = document.getElementById('boardArea');
 
-  /* clear previous tiles (all direct children except drop zones) */
+  /* remove old tiles (keep drop zones) */
   var kids = Array.prototype.slice.call(rowEl.children);
   kids.forEach(function(k) {
     if (k !== dropLEl && k !== dropREl) rowEl.removeChild(k);
@@ -720,36 +718,30 @@ function renderBoard() {
   var areaW = boardEl.clientWidth  || 320;
   var areaH = boardEl.clientHeight || 240;
 
-  /* ── try tile sizes from 28 down until chain fits ─── */
+  /* shrink tile size until chain fits */
   var S = 28;
   var layout;
-
   while (S >= 12) {
-    layout = computeSnakeLayout(S, areaW, areaH);
+    layout = computeSnakeLayout(S, areaW);
     if (layout.chainW <= areaW * 0.98 && layout.chainH <= areaH * 0.98) break;
     S -= 2;
   }
 
-  /* ── center boardRow absolutely inside boardArea ─── */
-  var chainW = layout.chainW;
-  var chainH = layout.chainH;
-  rowEl.style.width  = chainW + 'px';
-  rowEl.style.height = chainH + 'px';
-  rowEl.style.left   = Math.round((areaW - chainW) / 2) + 'px';
-  rowEl.style.top    = Math.round((areaH - chainH) / 2) + 'px';
+  /* center boardRow inside boardArea */
+  rowEl.style.width  = layout.chainW + 'px';
+  rowEl.style.height = layout.chainH + 'px';
+  rowEl.style.left   = Math.round((areaW - layout.chainW) / 2) + 'px';
+  rowEl.style.top    = Math.round((areaH - layout.chainH) / 2) + 'px';
 
-  /* ── place tiles ─────────────────────────────────── */
+  /* place tiles */
   layout.positions.forEach(function(pos, i) {
-    var bt = board[i];
-    /* Flip sA↔sB for left-going tiles so the connecting pip
-       always faces the correct neighbor.
-       - H tile going left: flip so right-side = connecting pip ✓
-       - Corner (V): never flip — top always connects up/right, bottom connects down/right
-       - Double (V) going left: flip has no visual effect but keep consistent */
+    var bt   = board[i];
+    /* flip sA↔sB for left-going non-corner tiles so the
+       connecting pip always faces toward its neighbor      */
     var flip = (pos.dir === 'left') && !pos.isCorner;
-    var tA = flip ? bt.sB : bt.sA;
-    var tB = flip ? bt.sA : bt.sB;
-    var el = makeTile(tA, tB, pos.orient, S);
+    var tA   = flip ? bt.sB : bt.sA;
+    var tB   = flip ? bt.sA : bt.sB;
+    var el   = makeTile(tA, tB, pos.orient, S);
     el.style.position = 'absolute';
     el.style.left     = pos.dx + 'px';
     el.style.top      = pos.dy + 'px';
@@ -758,10 +750,10 @@ function renderBoard() {
     rowEl.appendChild(el);
   });
 
-  /* ── drop zones ──────────────────────────────────── */
+  /* drop zones */
   var fp  = layout.positions[0];
   var lp  = layout.positions[layout.positions.length - 1];
-  var dzS = Math.max(18, S - 4);
+  var dzS = Math.max(18, S - 2);
 
   function showDZ(el, x, y) {
     el.style.display  = 'flex';
@@ -772,38 +764,33 @@ function renderBoard() {
     el.style.top      = y + 'px';
   }
 
-  /* left end */
-  if (fp.dir === 'right')
-    showDZ(dropLEl, fp.dx - dzS - 3, fp.dy + (fp.tH - dzS) / 2);
-  else
-    showDZ(dropLEl, fp.dx + fp.tW + 3, fp.dy + (fp.tH - dzS) / 2);
+  if (fp.dir === 'right') showDZ(dropLEl, fp.dx - dzS - 3, fp.dy + (fp.tH - dzS) / 2);
+  else                    showDZ(dropLEl, fp.dx + fp.tW + 3, fp.dy + (fp.tH - dzS) / 2);
 
-  /* right end */
-  if (lp.isCorner)
-    showDZ(dropREl, lp.dx + (lp.tW - dzS) / 2, lp.dy + lp.tH + 3);
-  else if (lp.dir === 'right')
-    showDZ(dropREl, lp.dx + lp.tW + 3, lp.dy + (lp.tH - dzS) / 2);
-  else
-    showDZ(dropREl, lp.dx - dzS - 3, lp.dy + (lp.tH - dzS) / 2);
+  if (lp.isCorner)             showDZ(dropREl, lp.dx + (lp.tW - dzS) / 2, lp.dy + lp.tH + 3);
+  else if (lp.dir === 'right') showDZ(dropREl, lp.dx + lp.tW + 3, lp.dy + (lp.tH - dzS) / 2);
+  else                         showDZ(dropREl, lp.dx - dzS - 3, lp.dy + (lp.tH - dzS) / 2);
 }
 
-/* ── Snake layout computation ────────────────────────────
-   Returns { positions[], chainW, chainH }
-   positions[i] = { dx, dy, orient, isCorner, dir, tW, tH }
-   dx, dy are already offset so minX=PAD, minY=PAD
-   ──────────────────────────────────────────────────────── */
-function computeSnakeLayout(S, areaW, areaH) {
+/* ── Snake layout engine ────────────────────────────────────
+   ANCHOR SYSTEM — guarantees exactly GAP pixels between tiles:
+     right-going → anchor = left edge of NEXT tile
+     left-going  → anchor = right edge of NEXT tile
+   This handles H (wide) ↔ V (narrow) transitions correctly.
+   ─────────────────────────────────────────────────────────── */
+function computeSnakeLayout(S, areaW) {
   var GAP = 3;
-  var TL  = S * 2 + GAP;  /* long side  */
-  var TS  = S;             /* short side */
+  var TL  = S * 2 + GAP;   /* long side  (normal / H tile) */
+  var TS  = S;              /* short side (double / corner) */
   var PAD = 10;
 
   var perRow = Math.max(3, Math.floor((areaW - PAD * 2) / (TL + GAP)));
 
-  var raw = [];             /* raw positions before offset */
-  var cx = 0, cy = 0;
-  var dir = 'right';
-  var col = 0;
+  var raw    = [];
+  var anchor = 0;   /* right → left-edge of next; left → right-edge of next */
+  var cy     = 0;
+  var dir    = 'right';
+  var col    = 0;
 
   for (var i = 0; i < board.length; i++) {
     var bt       = board[i];
@@ -813,34 +800,32 @@ function computeSnakeLayout(S, areaW, areaH) {
     var tW = (orient === 'H') ? TL : TS;
     var tH = (orient === 'H') ? TS : TL;
 
-    raw.push({ px: cx, py: cy, orient: orient,
-               isCorner: isCorner, dir: dir, tW: tW, tH: tH });
+    var left = (dir === 'right') ? anchor : anchor - tW;
+
+    raw.push({ px: left, py: cy, tW: tW, tH: tH,
+               orient: orient, isCorner: isCorner, dir: dir });
 
     if (isCorner) {
-      /* corner: advance row, flip direction, anchor next row to corner */
-      var ax = cx;
-      cy += TL + GAP;
-      col = 0;
+      var cRight = left + tW;
+      cy  += TL + GAP;
+      col  = 0;
       if (dir === 'right') {
-        /* was going right → now LEFT.
-           Corner at right end. First left-going tile right-aligns with corner. */
-        dir = 'left';
-        cx  = ax + tW - TL;  /* first tile: right-edge = corner right-edge */
+        dir    = 'left';
+        anchor = cRight;  /* first left tile: right = corner right */
       } else {
-        /* was going left → now RIGHT.
-           Corner at left end. First right-going tile starts at corner right edge. */
-        dir = 'right';
-        cx  = ax + TS;       /* first tile: left-edge = corner right-edge */
+        dir    = 'right';
+        anchor = cRight;  /* first right tile: left = corner right */
       }
     } else {
       col++;
-      cx += (dir === 'right') ? tW + GAP : -(tW + GAP);
+      if (dir === 'right') anchor = left + tW + GAP;
+      else                 anchor = left - GAP;
     }
   }
 
   /* bounding box */
-  var minX = Infinity, maxX = -Infinity;
-  var minY = Infinity, maxY = -Infinity;
+  var minX =  Infinity, maxX = -Infinity;
+  var minY =  Infinity, maxY = -Infinity;
   raw.forEach(function(p) {
     if (p.px        < minX) minX = p.px;
     if (p.py        < minY) minY = p.py;
@@ -848,123 +833,22 @@ function computeSnakeLayout(S, areaW, areaH) {
     if (p.py + p.tH > maxY) maxY = p.py + p.tH;
   });
 
-  /* apply offset so all coords are >= PAD */
   var offX = -minX + PAD;
   var offY = -minY + PAD;
 
-  var positions = raw.map(function(p) {
-    return {
-      dx: p.px + offX,  dy: p.py + offY,
-      tW: p.tW,         tH: p.tH,
-      orient: p.orient, isCorner: p.isCorner, dir: p.dir
-    };
-  });
-
   return {
-    positions: positions,
+    positions: raw.map(function(p) {
+      return {
+        dx: p.px + offX,  dy: p.py + offY,
+        tW: p.tW,         tH: p.tH,
+        orient: p.orient, isCorner: p.isCorner, dir: p.dir
+      };
+    }),
     chainW: maxX - minX + PAD * 2,
     chainH: maxY - minY + PAD * 2
   };
 }
 
-
-function renderCurrentHand() {
-  var p=players[curPlayer];
-  var handEl=document.getElementById('playerHand');
-  handEl.innerHTML='';
-  // NEVER show AI tiles face-up
-  if(p.isAI){
-    document.getElementById('handLabel').innerHTML='';
-    return;
-  }
-  var playIds={};
-  p.hand.filter(function(t){return canPlay(t,L,R);}).forEach(function(t){playIds[t.id]=1;});
-  p.hand.forEach(function(t,i){
-    var isP=!!playIds[t.id];
-    var el=makeTile(t.a,t.b,'V',36,{playable:isP});
-    el.style.animation='handUp .26s ease '+(i*.05)+'s both';
-    if(isP){
-      el.addEventListener('click',function(){onTap(t);});
-      el.setAttribute('draggable','true');
-      el.addEventListener('dragstart',function(e){dragT=t;e.dataTransfer.effectAllowed='move';});
-      el.addEventListener('dragend',function(){dragT=null;});
-    }
-    handEl.appendChild(el);
-  });
-  var col=PLAYER_COLORS[curPlayer];
-  document.getElementById('handLabel').innerHTML=
-    '<span style="color:'+col+';font-weight:900">'+PLAYER_EMOJIS[curPlayer]+' '+p.name+'</span> — '+
-    p.hand.length+' '+t('tilesLbl')+' · PIPS: '+sumH(p.hand);
-}
-
-function renderAIArea() {
-  var aiAreaEl=document.getElementById('aiArea');
-  if(mode!=='ai'){aiAreaEl.style.display='none';return;}
-  aiAreaEl.style.display='block';
-  var ai=players[1], c=document.getElementById('aiHand');
-  c.innerHTML='';
-  ai.hand.forEach(function(t,i){
-    var el=makeTile(0,0,'V',26,{hidden:true});
-    el.style.animation='handUp .22s ease '+(i*.04)+'s both';
-    c.appendChild(el);
-  });
-  document.getElementById('aiCnt').textContent=ai.hand.length;
-  document.getElementById('aiPip').textContent='?'; // hidden
-}
-
-function renderOpponents() {
-  var oppsArea=document.getElementById('oppsArea');
-  var oppsRow=document.getElementById('oppsRow');
-  if(mode!=='multi'||numPlayers<=2){oppsArea.style.display='none';return;}
-  oppsArea.style.display='block'; oppsRow.innerHTML='';
-  players.forEach(function(p,i){
-    if(i===curPlayer) return;
-    var col=PLAYER_COLORS[i];
-    var group=document.createElement('div'); group.className='opp-group';
-    var label=document.createElement('div'); label.className='opp-label'; label.style.color=col;
-    label.textContent=PLAYER_EMOJIS[i]+' '+p.name+' ('+p.hand.length+')';
-    group.appendChild(label);
-    var tiles=document.createElement('div'); tiles.className='opp-tiles';
-    var show=Math.min(p.hand.length,5);
-    for(var j=0;j<show;j++) tiles.appendChild(makeTile(0,0,'V',20,{hidden:true}));
-    if(p.hand.length>show){var more=document.createElement('div');more.className='opp-more';more.textContent='+'+(p.hand.length-show);tiles.appendChild(more);}
-    group.appendChild(tiles); oppsRow.appendChild(group);
-  });
-}
-
-function renderStatus() {
-  var p=players[curPlayer], col=PLAYER_COLORS[curPlayer];
-  document.getElementById('tDot').style.background=col;
-  document.getElementById('tLbl').textContent=p.isAI?t('aiThinking'):(p.name.toUpperCase()+(t('yoursTurn')||"'S TURN").toUpperCase());
-  document.getElementById('tLbl').style.color=col;
-  document.getElementById('byCnt').textContent=BY.length;
-  document.getElementById('boneCnt').textContent=BY.length;
-  var scoreEl=document.getElementById('scoreDisp');
-  if(mode==='ai'){
-    scoreEl.innerHTML='<b style="color:'+PLAYER_COLORS[0]+'">'+players[0].score+'</b> — <b style="color:'+PLAYER_COLORS[1]+'">'+players[1].score+'</b>';
-  } else {
-    scoreEl.textContent=players.map(function(p){return p.score;}).join(' – ');
-  }
-  renderMenuScores();
-  // Pass button
-  var playable=p.isAI?[]:p.hand.filter(function(t){return canPlay(t,L,R);});
-  var needPass=!p.isAI&&!handoffPending&&playable.length===0&&(BY.length===0||gameRule==='block');
-  var btnP=document.getElementById('btnPass');
-  btnP.setAttribute('data-pass-ready', needPass?'1':'0');
-  btnP.style.opacity=needPass?'1':'0.28';
-  btnP.style.cursor=needPass?'pointer':'default';
-  btnP.style.background=needPass?'rgba(192,57,43,.22)':'rgba(192,57,43,.04)';
-  btnP.style.color=needPass?'#e74c3c':'rgba(231,76,60,.35)';
-  btnP.style.boxShadow=needPass?'0 0 18px rgba(231,76,60,.3)':'none';
-  // Boneyard active (only draw mode)
-  var canDraw=gameRule==='draw'&&!p.isAI&&p.hand.filter(function(t){return canPlay(t,L,R);}).length===0&&BY.length>0;
-  var boneEl=document.getElementById('boneyard');
-  boneEl.classList.toggle('active',canDraw);
-  // Show/hide boneyard in block mode
-  boneEl.style.display=gameRule==='block'?'none':'flex';
-}
-
-/* Board color — FIX: always write to #boardArea directly */
 function renderBoardBg() {
   var area = document.getElementById('boardArea');
   area.style.background = BOARD_GRADIENTS[cfg.boardColor] || BOARD_GRADIENTS.green;
