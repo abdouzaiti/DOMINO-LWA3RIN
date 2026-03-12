@@ -694,11 +694,12 @@ function buildQuickPhrases() {
 function renderBoard() {
   var emptyEl = document.getElementById('emptyBoard');
   var rowEl   = document.getElementById('boardRow');
-  var tilesEl = document.getElementById('bTiles');
   var dropLEl = document.getElementById('dropL');
   var dropREl = document.getElementById('dropR');
 
-  tilesEl.innerHTML = '';
+  /* Clear only tiles (not the drop zones or bTiles wrapper) */
+  var old = rowEl.querySelectorAll('.btile');
+  for (var k = 0; k < old.length; k++) old[k].remove();
   dropLEl.style.display = 'none';
   dropREl.style.display = 'none';
 
@@ -793,10 +794,11 @@ function renderBoard() {
     if (i === board.length - 1) {
       el.style.animation = 'tileIn .3s cubic-bezier(.34,1.56,.64,1)';
     }
+    el.className  = 'btile';
     el.style.position = 'absolute';
     el.style.left     = pos.px + 'px';
     el.style.top      = pos.py + 'px';
-    tilesEl.appendChild(el);
+    rowEl.appendChild(el);
   });
 
   /* ── drop zones ──────────────────────────────────────────── */
